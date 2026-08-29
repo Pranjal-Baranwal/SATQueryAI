@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 from PIL import Image
 from dotenv import load_dotenv
+
 from transformers import (
     AutoProcessor,
     Qwen2_5_VLForConditionalGeneration,
@@ -449,17 +450,19 @@ class SIAInference:
             "\nGenerating SIA response..."
         )
 
+        generation_kwargs = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": temperature > 0
+        }
+
+        if temperature > 0:
+            generation_kwargs["temperature"] = temperature
+
         with torch.inference_mode():
 
             generated_ids = self.model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=(
-                    temperature > 0
-                ),
-                temperature=temperature
-                if temperature > 0
-                else None
+                **generation_kwargs
             )
 
         # ----------------------------------------------------
@@ -496,8 +499,8 @@ class SIAInference:
         if self.device == "cuda":
 
             gpu_memory = round(
-                torch.cuda.memory_allocated() /
-                (1024 ** 3),
+                torch.cuda.memory_allocated()
+                / (1024 ** 3),
                 2
             )
 
@@ -597,12 +600,34 @@ def analyze_image(
 
 
 # ============================================================
+# ROUTING GRAPH INTERFACE
+# ============================================================
+
+def run_sia(
+    image_path,
+    query,
+    analysis_type="general"
+):
+    """
+    Execute SIA through the routing pipeline.
+
+    This function is used by routing.graph / app.py.
+    """
+
+    return sia_engine.analyze(
+        image_path=image_path,
+        query=query,
+        analysis_type=analysis_type
+    )
+
+
+# ============================================================
 # TEST
 # ============================================================
 
 if __name__ == "__main__":
 
-    image_path = "data/output/SAR_band1.png"
+    image_path = "data/input/T1.png"
 
     query = (
         "Describe the major features visible "
