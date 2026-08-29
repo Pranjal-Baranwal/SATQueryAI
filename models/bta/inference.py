@@ -45,7 +45,11 @@ MODEL_ID = os.getenv(
     "Qingyun/RSCoVLM-7B-2512"
 )
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "cpu"
+)
 
 MAX_IMAGE_SIZE = 1024
 
@@ -89,6 +93,7 @@ class BTAInference:
         self.processor = None
 
         self.loaded = False
+
 
     # ========================================================
     # MODEL LOADING
@@ -179,8 +184,9 @@ class BTAInference:
             "\nBTA model loaded successfully."
         )
 
+
     # ========================================================
-    # GEOTIFF → RGB
+    # IMAGE LOADING
     # ========================================================
 
     @staticmethod
@@ -189,12 +195,7 @@ class BTAInference:
         max_size=MAX_IMAGE_SIZE
     ):
         """
-        Read a GeoTIFF and convert it to a VLM-friendly RGB image.
-
-        Handles:
-            - 1-band GeoTIFF
-            - 3-band GeoTIFF
-            - multi-band GeoTIFF
+        Read a GeoTIFF or normal image and convert it to RGB.
         """
 
         image_path = Path(
@@ -207,112 +208,77 @@ class BTAInference:
                 f"Image not found: {image_path}"
             )
 
-        print(
-            f"Reading GeoTIFF: {image_path}"
-        )
+        suffix = image_path.suffix.lower()
 
-        with rasterio.open(image_path) as src:
+        # ----------------------------------------------------
+        # Normal image
+        # ----------------------------------------------------
 
-            band_count = src.count
+        if suffix in [
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".bmp",
+            ".webp"
+        ]:
 
-            # ------------------------------------------------
-            # Single band
-            # ------------------------------------------------
+            print(
+                f"Reading standard image: {image_path}"
+            )
 
-            if band_count == 1:
+            image = Image.open(
+                image_path
+            ).convert(
+                "RGB"
+            )
 
-                data = src.read(1)
+        # ----------------------------------------------------
+        # GeoTIFF
+        # ----------------------------------------------------
 
-                data = data.astype(
-                    np.float32
-                )
+        else:
 
-                # Handle NaN
-                data = np.nan_to_num(
-                    data,
-                    nan=0.0
-                )
+            print(
+                f"Reading GeoTIFF: {image_path}"
+            )
 
-                min_value = np.percentile(
-                    data,
-                    2
-                )
+            with rasterio.open(
+                image_path
+            ) as src:
 
-                max_value = np.percentile(
-                    data,
-                    98
-                )
+                band_count = src.count
 
-                if max_value > min_value:
+                # --------------------------------------------
+                # Single band
+                # --------------------------------------------
 
-                    data = (
-                        (data - min_value)
-                        /
-                        (max_value - min_value)
-                        *
-                        255.0
+                if band_count == 1:
+
+                    data = src.read(1)
+
+                    data = data.astype(
+                        np.float32
                     )
 
-                else:
-
-                    data = np.zeros_like(
-                        data
-                    )
-
-                data = np.clip(
-                    data,
-                    0,
-                    255
-                ).astype(
-                    np.uint8
-                )
-
-                rgb = np.stack(
-                    [
+                    data = np.nan_to_num(
                         data,
-                        data,
-                        data
-                    ],
-                    axis=-1
-                )
-
-            # ------------------------------------------------
-            # Three or more bands
-            # ------------------------------------------------
-
-            else:
-
-                bands = src.read(
-                    [1, 2, 3]
-                )
-
-                bands = bands.astype(
-                    np.float32
-                )
-
-                rgb_bands = []
-
-                for band in bands:
-
-                    band = np.nan_to_num(
-                        band,
                         nan=0.0
                     )
 
                     low = np.percentile(
-                        band,
+                        data,
                         2
                     )
 
                     high = np.percentile(
-                        band,
+                        data,
                         98
                     )
 
                     if high > low:
 
-                        band = (
-                            (band - low)
+                        data = (
+                            (data - low)
                             /
                             (high - low)
                             *
@@ -321,31 +287,95 @@ class BTAInference:
 
                     else:
 
-                        band = np.zeros_like(
-                            band
+                        data = np.zeros_like(
+                            data
                         )
 
-                    band = np.clip(
-                        band,
+                    data = np.clip(
+                        data,
                         0,
                         255
+                    ).astype(
+                        np.uint8
                     )
 
-                    rgb_bands.append(
-                        band.astype(
-                            np.uint8
+                    rgb = np.stack(
+                        [
+                            data,
+                            data,
+                            data
+                        ],
+                        axis=-1
+                    )
+
+                # --------------------------------------------
+                # Three or more bands
+                # --------------------------------------------
+
+                else:
+
+                    bands = src.read(
+                        [1, 2, 3]
+                    ).astype(
+                        np.float32
+                    )
+
+                    rgb_bands = []
+
+                    for band in bands:
+
+                        band = np.nan_to_num(
+                            band,
+                            nan=0.0
                         )
+
+                        low = np.percentile(
+                            band,
+                            2
+                        )
+
+                        high = np.percentile(
+                            band,
+                            98
+                        )
+
+                        if high > low:
+
+                            band = (
+                                (band - low)
+                                /
+                                (high - low)
+                                *
+                                255.0
+                            )
+
+                        else:
+
+                            band = np.zeros_like(
+                                band
+                            )
+
+                        band = np.clip(
+                            band,
+                            0,
+                            255
+                        )
+
+                        rgb_bands.append(
+                            band.astype(
+                                np.uint8
+                            )
+                        )
+
+                    rgb = np.stack(
+                        rgb_bands,
+                        axis=-1
                     )
 
-                rgb = np.stack(
-                    rgb_bands,
-                    axis=-1
-                )
-
-        image = Image.fromarray(
-            rgb,
-            mode="RGB"
-        )
+            image = Image.fromarray(
+                rgb,
+                mode="RGB"
+            )
 
         # ----------------------------------------------------
         # Resize
@@ -372,6 +402,7 @@ class BTAInference:
         )
 
         return image
+
 
     # ========================================================
     # PROMPT
@@ -446,6 +477,7 @@ class BTAInference:
                 f"{analysis_type}"
             )
 
+
     # ========================================================
     # MESSAGE CREATION
     # ========================================================
@@ -456,6 +488,7 @@ class BTAInference:
     ):
 
         return [
+
             {
                 "role": "system",
                 "content": [
@@ -465,15 +498,18 @@ class BTAInference:
                     }
                 ]
             },
+
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "image"
                     },
+
                     {
                         "type": "image"
                     },
+
                     {
                         "type": "text",
                         "text": prompt
@@ -481,6 +517,7 @@ class BTAInference:
                 ]
             }
         ]
+
 
     # ========================================================
     # ANALYSIS
@@ -569,17 +606,13 @@ class BTAInference:
         # Chat template
         # ----------------------------------------------------
 
-        template_start = time.time()
+        processing_start = time.time()
 
         text = self.processor.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True
         )
-
-        # ----------------------------------------------------
-        # Processor
-        # ----------------------------------------------------
 
         inputs = self.processor(
             text=[text],
@@ -591,13 +624,13 @@ class BTAInference:
             return_tensors="pt"
         )
 
-        template_time = (
+        processing_time = (
             time.time()
-            - template_start
+            - processing_start
         )
 
         # ----------------------------------------------------
-        # Move tensors
+        # Move tensors to GPU
         # ----------------------------------------------------
 
         if self.device == "cuda":
@@ -610,7 +643,7 @@ class BTAInference:
             }
 
         # ----------------------------------------------------
-        # GPU synchronization
+        # Synchronize
         # ----------------------------------------------------
 
         if self.device == "cuda":
@@ -645,7 +678,7 @@ class BTAInference:
         )
 
         # ----------------------------------------------------
-        # Remove prompt tokens
+        # Remove input tokens
         # ----------------------------------------------------
 
         input_token_length = (
@@ -684,6 +717,10 @@ class BTAInference:
                 2
             )
 
+        # ----------------------------------------------------
+        # Total time
+        # ----------------------------------------------------
+
         total_time = (
             time.time()
             - total_start
@@ -709,7 +746,7 @@ class BTAInference:
 
         print(
             f"Processing    : "
-            f"{template_time:.2f} sec"
+            f"{processing_time:.2f} sec"
         )
 
         print(
@@ -727,27 +764,42 @@ class BTAInference:
         )
 
         # ----------------------------------------------------
-        # Result
+        # Return result
         # ----------------------------------------------------
 
         return {
+
             "model": self.model_id,
+
             "analysis_type": analysis_type,
-            "image_t1": str(image_t1_path),
-            "image_t2": str(image_t2_path),
+
+            "image_t1": str(
+                image_t1_path
+            ),
+
+            "image_t2": str(
+                image_t2_path
+            ),
+
             "query": query,
+
             "answer": answer,
+
             "device": self.device,
+
             "gpu_memory_gb": gpu_memory,
+
             "generation_time_seconds": round(
                 generation_time,
                 2
             ),
+
             "total_time_seconds": round(
                 total_time,
                 2
             )
         }
+
 
     # ========================================================
     # SIMPLE COMPARE
@@ -763,12 +815,19 @@ class BTAInference:
         )
     ):
 
-        return self.analyze(
+        result = self.analyze(
+
             image_t1_path=image_t1_path,
+
             image_t2_path=image_t2_path,
+
             query=query,
+
             analysis_type="general"
-        )["answer"]
+        )
+
+        return result["answer"]
+
 
     # ========================================================
     # STATUS
@@ -777,14 +836,21 @@ class BTAInference:
     def status(self):
 
         return {
+
             "model_id": self.model_id,
+
             "device": self.device,
-            "cuda_available": torch.cuda.is_available(),
-            "loaded": self.loaded
+
+            "cuda_available":
+                torch.cuda.is_available(),
+
+            "loaded":
+                self.loaded
         }
 
+
     # ========================================================
-    # UNLOAD
+    # UNLOAD MODEL
     # ========================================================
 
     def unload_model(self):
@@ -798,6 +864,7 @@ class BTAInference:
             del self.processor
 
         self.model = None
+
         self.processor = None
 
         self.loaded = False
@@ -812,14 +879,14 @@ class BTAInference:
 
 
 # ============================================================
-# GLOBAL ENGINE
+# GLOBAL BTA ENGINE
 # ============================================================
 
 bta_engine = BTAInference()
 
 
 # ============================================================
-# CONVENIENCE FUNCTION
+# EXISTING CONVENIENCE FUNCTION
 # ============================================================
 
 def analyze_change(
@@ -830,15 +897,47 @@ def analyze_change(
 ):
 
     return bta_engine.analyze(
+
         image_t1_path=image_t1_path,
+
         image_t2_path=image_t2_path,
+
         query=query,
+
         analysis_type=analysis_type
     )
 
 
 # ============================================================
-# TEST
+# ROUTING GRAPH INTERFACE
+# ============================================================
+
+def run_bta(
+    t1_path,
+    t2_path,
+    query,
+    analysis_type="general"
+):
+    """
+    Interface used by routing.graph.
+
+    This is only a wrapper around the existing BTA engine.
+    """
+
+    return bta_engine.analyze(
+
+        image_t1_path=t1_path,
+
+        image_t2_path=t2_path,
+
+        query=query,
+
+        analysis_type=analysis_type
+    )
+
+
+# ============================================================
+# STANDALONE TEST
 # ============================================================
 
 if __name__ == "__main__":
@@ -871,9 +970,13 @@ if __name__ == "__main__":
     try:
 
         result = analyze_change(
+
             image_t1_path=image_t1_path,
+
             image_t2_path=image_t2_path,
+
             query=query,
+
             analysis_type="general"
         )
 
