@@ -1,26 +1,3 @@
-"""
-Cross-Modal Fusion
-==================
-
-Combines Optical and SAR satellite imagery into a common
-feature representation for cross-modal analysis.
-
-Optical:
-    T1.png
-
-SAR:
-    Sample.tif
-
-This module performs:
-    1. Image loading
-    2. Normalization
-    3. Dimension alignment
-    4. Feature-level concatenation
-    5. Cross-modal statistics
-    6. Saving fused features
-
-VLM inference is handled separately in inference.py.
-"""
 
 from pathlib import Path
 
@@ -30,18 +7,12 @@ import rasterio
 from PIL import Image
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
 DEFAULT_OUTPUT_DIR = "data/output"
 
 DEFAULT_TARGET_SIZE = 1024
 
 
-# ============================================================
-# CROSS-MODAL FUSION CLASS
-# ============================================================
 
 class CrossModalFusion:
     """
@@ -81,9 +52,6 @@ class CrossModalFusion:
             exist_ok=True
         )
 
-    # ========================================================
-    # FILE VALIDATION
-    # ========================================================
 
     @staticmethod
     def validate_file(
@@ -117,9 +85,6 @@ class CrossModalFusion:
 
         return file_path
 
-    # ========================================================
-    # LOAD NORMAL IMAGE
-    # ========================================================
 
     @staticmethod
     def load_standard_image(
@@ -158,10 +123,6 @@ class CrossModalFusion:
 
         return array
 
-    # ========================================================
-    # LOAD GEOTIFF
-    # ========================================================
-
     @staticmethod
     def load_geotiff(
         file_path
@@ -183,10 +144,6 @@ class CrossModalFusion:
         return data.astype(
             np.float32
         )
-
-    # ========================================================
-    # LOAD IMAGE AUTOMATICALLY
-    # ========================================================
 
     def load_image(
         self,
@@ -243,9 +200,6 @@ class CrossModalFusion:
 
         return data
 
-    # ========================================================
-    # NORMALIZE
-    # ========================================================
 
     @staticmethod
     def normalize(
@@ -316,10 +270,6 @@ class CrossModalFusion:
 
         return normalized
 
-    # ========================================================
-    # RESIZE
-    # ========================================================
-
     @staticmethod
     def resize_array(
         data,
@@ -334,7 +284,6 @@ class CrossModalFusion:
 
         for band in data:
 
-            # Convert to uint8 temporarily for PIL
 
             band_min = band.min()
             band_max = band.max()
@@ -393,9 +342,6 @@ class CrossModalFusion:
             axis=0
         )
 
-    # ========================================================
-    # RESIZE TO TARGET SIZE
-    # ========================================================
 
     def resize_to_target(
         self,
@@ -450,9 +396,6 @@ class CrossModalFusion:
             target_width
         )
 
-    # ========================================================
-    # ALIGN DIMENSIONS
-    # ========================================================
 
     @staticmethod
     def align_dimensions(
@@ -523,9 +466,6 @@ class CrossModalFusion:
 
         return optical, sar
 
-    # ========================================================
-    # CREATE OPTICAL FEATURES
-    # ========================================================
 
     @staticmethod
     def create_optical_features(
@@ -537,9 +477,6 @@ class CrossModalFusion:
 
         return optical
 
-    # ========================================================
-    # CREATE SAR FEATURES
-    # ========================================================
 
     @staticmethod
     def create_sar_features(
@@ -551,9 +488,6 @@ class CrossModalFusion:
 
         return sar
 
-    # ========================================================
-    # FEATURE FUSION
-    # ========================================================
 
     @staticmethod
     def fuse_features(
@@ -588,10 +522,6 @@ class CrossModalFusion:
         )
 
         return fused
-
-    # ========================================================
-    # STATISTICS
-    # ========================================================
 
     @staticmethod
     def calculate_statistics(
@@ -663,9 +593,6 @@ class CrossModalFusion:
             "fused_std": fused_std
         }
 
-    # ========================================================
-    # SAVE FUSED FEATURES
-    # ========================================================
 
     def save_features(
         self,
@@ -688,10 +615,6 @@ class CrossModalFusion:
 
         return output_path
 
-    # ========================================================
-    # COMPLETE PIPELINE
-    # ========================================================
-
     def process(
         self,
         optical_path,
@@ -713,10 +636,6 @@ class CrossModalFusion:
             f"SAR:     {sar_path}"
         )
 
-        # ----------------------------------------------------
-        # Load Optical
-        # ----------------------------------------------------
-
         optical = self.load_image(
             optical_path
         )
@@ -726,9 +645,6 @@ class CrossModalFusion:
             f"{optical.shape}"
         )
 
-        # ----------------------------------------------------
-        # Load SAR
-        # ----------------------------------------------------
 
         sar = self.load_image(
             sar_path
@@ -739,9 +655,6 @@ class CrossModalFusion:
             f"{sar.shape}"
         )
 
-        # ----------------------------------------------------
-        # Normalize
-        # ----------------------------------------------------
 
         print(
             "\nNormalizing modalities..."
@@ -754,10 +667,6 @@ class CrossModalFusion:
         sar = self.normalize(
             sar
         )
-
-        # ----------------------------------------------------
-        # Resize
-        # ----------------------------------------------------
 
         print(
             "Resizing modalities..."
@@ -781,10 +690,6 @@ class CrossModalFusion:
             f"{sar.shape}"
         )
 
-        # ----------------------------------------------------
-        # Align
-        # ----------------------------------------------------
-
         print(
             "\nAligning modalities..."
         )
@@ -802,9 +707,6 @@ class CrossModalFusion:
             f"{optical.shape[1]}"
         )
 
-        # ----------------------------------------------------
-        # Feature representations
-        # ----------------------------------------------------
 
         optical_features = (
             self.create_optical_features(
@@ -818,9 +720,6 @@ class CrossModalFusion:
             )
         )
 
-        # ----------------------------------------------------
-        # Fusion
-        # ----------------------------------------------------
 
         print(
             "\nFusing Optical + SAR features..."
@@ -836,9 +735,6 @@ class CrossModalFusion:
             f"{fused.shape}"
         )
 
-        # ----------------------------------------------------
-        # Statistics
-        # ----------------------------------------------------
 
         statistics = (
             self.calculate_statistics(
@@ -847,10 +743,6 @@ class CrossModalFusion:
                 fused
             )
         )
-
-        # ----------------------------------------------------
-        # Save
-        # ----------------------------------------------------
 
         fused_path = (
             self.save_features(
@@ -862,10 +754,6 @@ class CrossModalFusion:
             f"\nFused features saved to: "
             f"{fused_path}"
         )
-
-        # ----------------------------------------------------
-        # Print statistics
-        # ----------------------------------------------------
 
         print(
             "\n========== FUSION STATISTICS =========="
@@ -892,18 +780,12 @@ class CrossModalFusion:
         }
 
 
-# ============================================================
-# GLOBAL FUSION ENGINE
-# ============================================================
 
 fusion_engine = (
     CrossModalFusion()
 )
 
 
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def fuse_optical_sar(
     optical_path,
@@ -915,10 +797,6 @@ def fuse_optical_sar(
         sar_path=sar_path
     )
 
-
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 

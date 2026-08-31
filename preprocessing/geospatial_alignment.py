@@ -170,7 +170,6 @@ class GeoSpatialAligner:
 
         reference = self.reference_info
 
-        # Convert string to Rasterio Resampling enum
         try:
             resampling = getattr(
                 Resampling,
@@ -191,8 +190,6 @@ class GeoSpatialAligner:
 
         with rasterio.open(self.source_path) as source_src:
 
-            # Output profile follows the source raster,
-            # but spatial properties follow the reference.
             profile = source_src.profile.copy()
 
             profile.update(
@@ -206,7 +203,6 @@ class GeoSpatialAligner:
                 }
             )
 
-            # Use float32 so NaN can represent NoData safely.
             profile.update(
                 {
                     "dtype": "float32",

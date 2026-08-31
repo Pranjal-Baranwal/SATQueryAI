@@ -1,46 +1,3 @@
-"""
-TriNetra - Geospatial Visualization
-------------------------------------
-
-Purpose
--------
-Render spatial evidence produced by TriNetra.
-
-This module DOES NOT:
-    - perform VQA
-    - perform captioning
-    - perform Optical + SAR reasoning
-    - calculate NDVI / NDWI / NDBI
-    - detect change itself
-    - decide what a region means
-
-It ONLY VISUALIZES spatial outputs such as:
-
-    - Bounding boxes
-    - Segmentation masks
-    - Change masks
-    - Points / coordinates
-
-Supported input images:
-    - GeoTIFF (.tif / .tiff)
-    - PNG
-    - JPEG / JPG
-
-TriNetra flow:
-
-    MODEL / GEOSPATIAL MODULE
-              |
-              | spatial output
-              v
-       visualization.py
-              |
-              v
-       Evidence Image
-              |
-              v
-       Final TriNetra Output
-"""
-
 from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple, Union
 
@@ -48,18 +5,8 @@ import numpy as np
 import rasterio
 from PIL import Image, ImageDraw
 
-
-# =====================================================================
-# Type aliases
-# =====================================================================
-
 Point = Tuple[float, float]
 Box = Tuple[float, float, float, float]
-
-
-# =====================================================================
-# Spatial Visualizer
-# =====================================================================
 
 class SpatialVisualizer:
     """
@@ -91,9 +38,6 @@ class SpatialVisualizer:
 
         self.image = self._load_image()
 
-    # =================================================================
-    # Load image
-    # =================================================================
 
     def _load_image(self) -> Image.Image:
         """
@@ -122,9 +66,6 @@ class SpatialVisualizer:
             "Use GeoTIFF, JPEG or PNG."
         )
 
-    # =================================================================
-    # GeoTIFF loader
-    # =================================================================
 
     def _load_geotiff(self) -> Image.Image:
         """
@@ -255,9 +196,6 @@ class SpatialVisualizer:
             mode="RGB"
         )
 
-    # =================================================================
-    # Save image
-    # =================================================================
 
     def save(
         self,
@@ -281,10 +219,6 @@ class SpatialVisualizer:
         )
 
         return str(output)
-
-    # =================================================================
-    # Bounding box
-    # =================================================================
 
     def draw_bounding_box(
         self,
@@ -337,9 +271,6 @@ class SpatialVisualizer:
                 fill="red"
             )
 
-    # =================================================================
-    # Multiple bounding boxes
-    # =================================================================
 
     def draw_bounding_boxes(
         self,
@@ -396,9 +327,6 @@ class SpatialVisualizer:
                 width=width
             )
 
-    # =================================================================
-    # Prepare mask
-    # =================================================================
 
     @staticmethod
     def _prepare_mask(
@@ -423,10 +351,6 @@ class SpatialVisualizer:
             return mask
 
         return mask > 0
-
-    # =================================================================
-    # Resize mask
-    # =================================================================
 
     def _resize_mask(
         self,
@@ -466,9 +390,6 @@ class SpatialVisualizer:
             ) > 0
         )
 
-    # =================================================================
-    # Draw mask
-    # =================================================================
 
     def draw_mask(
         self,
@@ -521,9 +442,6 @@ class SpatialVisualizer:
             overlay
         ).convert("RGB")
 
-    # =================================================================
-    # Draw mask boundary
-    # =================================================================
 
     def draw_mask_boundary(
         self,
@@ -609,10 +527,6 @@ class SpatialVisualizer:
                 fill="red"
             )
 
-    # =================================================================
-    # Draw point
-    # =================================================================
-
     def draw_point(
         self,
         point: Point,
@@ -661,10 +575,6 @@ class SpatialVisualizer:
                 fill="red"
             )
 
-    # =================================================================
-    # Geographic → pixel
-    # =================================================================
-
     def geographic_to_pixel(
         self,
         x: float,
@@ -695,10 +605,6 @@ class SpatialVisualizer:
             float(row)
         )
 
-    # =================================================================
-    # Geographic point
-    # =================================================================
-
     def draw_geographic_point(
         self,
         x: float,
@@ -721,9 +627,6 @@ class SpatialVisualizer:
             label=label
         )
 
-    # =================================================================
-    # Complete spatial rendering
-    # =================================================================
 
     def render_evidence(
         self,
@@ -806,9 +709,6 @@ class SpatialVisualizer:
 
         return self.image
 
-    # =================================================================
-    # Spatial metadata
-    # =================================================================
 
     def spatial_metadata(
         self
@@ -853,10 +753,6 @@ class SpatialVisualizer:
 
         return metadata
 
-
-# =====================================================================
-# Convenience functions
-# =====================================================================
 
 def visualize_bounding_boxes(
     image_path: str,
@@ -989,9 +885,6 @@ def visualize_spatial_output(
     )
 
 
-# =====================================================================
-# Local test
-# =====================================================================
 
 if __name__ == "__main__":
 

@@ -53,10 +53,8 @@ class GeoTIFFReader:
                 "name": src.name
             }
 
-            # Read all bands
             self.data = src.read()
 
-            # Convert NoData values to NaN when applicable
             if src.nodata is not None:
                 self.data = self.data.astype(np.float32)
                 self.data[self.data == src.nodata] = np.nan
@@ -174,7 +172,6 @@ def read_geotiff(file_path):
 
 if __name__ == "__main__":
 
-    # Change this to your actual GeoTIFF file
     file_path = "data/input/Sample.tif"
 
     try:

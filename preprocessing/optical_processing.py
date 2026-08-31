@@ -56,9 +56,6 @@ class OpticalProcessor:
 
             self.transform = src.transform
 
-    # ---------------------------------------------------------
-    # BASIC BAND OPERATIONS
-    # ---------------------------------------------------------
 
     def get_band(self, band_number):
         """
@@ -80,10 +77,6 @@ class OpticalProcessor:
         """Return the number of bands."""
 
         return self.band_count
-
-    # ---------------------------------------------------------
-    # NORMALIZATION
-    # ---------------------------------------------------------
 
     @staticmethod
     def normalize_band(
@@ -143,9 +136,6 @@ class OpticalProcessor:
 
         return normalized.astype(np.uint8)
 
-    # ---------------------------------------------------------
-    # RGB
-    # ---------------------------------------------------------
 
     def create_rgb(
         self,
@@ -180,9 +170,6 @@ class OpticalProcessor:
 
         return rgb
 
-    # ---------------------------------------------------------
-    # FALSE COLOR
-    # ---------------------------------------------------------
 
     def create_false_color(
         self,
@@ -217,10 +204,6 @@ class OpticalProcessor:
         )
 
         return false_color
-
-    # ---------------------------------------------------------
-    # NDVI
-    # ---------------------------------------------------------
 
     def calculate_ndvi(
         self,
@@ -264,9 +247,6 @@ class OpticalProcessor:
             1
         )
 
-    # ---------------------------------------------------------
-    # NDWI
-    # ---------------------------------------------------------
 
     def calculate_ndwi(
         self,
@@ -307,9 +287,6 @@ class OpticalProcessor:
             1
         )
 
-    # ---------------------------------------------------------
-    # NDBI
-    # ---------------------------------------------------------
 
     def calculate_ndbi(
         self,
@@ -350,9 +327,6 @@ class OpticalProcessor:
             1
         )
 
-    # ---------------------------------------------------------
-    # INDEX NORMALIZATION
-    # ---------------------------------------------------------
 
     @staticmethod
     def normalize_index(index):
@@ -377,10 +351,6 @@ class OpticalProcessor:
         return (
             result * 255
         ).astype(np.uint8)
-
-    # ---------------------------------------------------------
-    # SAVE RGB IMAGE
-    # ---------------------------------------------------------
 
     @staticmethod
     def save_image(
@@ -412,10 +382,6 @@ class OpticalProcessor:
         )
 
         return str(output_path)
-
-    # ---------------------------------------------------------
-    # SAVE INDEX AS GeoTIFF
-    # ---------------------------------------------------------
 
     def save_index_geotiff(
         self,
@@ -460,9 +426,6 @@ class OpticalProcessor:
 
         return str(output_path)
 
-    # ---------------------------------------------------------
-    # INFORMATION
-    # ---------------------------------------------------------
 
     def print_info(self):
         """Print basic information about the optical raster."""
@@ -505,9 +468,6 @@ class OpticalProcessor:
         print("===============================================\n")
 
 
-# =============================================================
-# CONVENIENCE FUNCTIONS
-# =============================================================
 
 def calculate_ndvi(
     file_path,
@@ -549,9 +509,6 @@ def create_rgb(
     )
 
 
-# =============================================================
-# TEST
-# =============================================================
 
 if __name__ == "__main__":
 

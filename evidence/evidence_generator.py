@@ -1,29 +1,6 @@
-"""
-Evidence Generator
-==================
-
-Collects outputs from the SATQueryAI analysis modules and
-converts them into structured evidence.
-
-Evidence sources:
-    - Single Image Analysis (SIA)
-    - Bi-Temporal Analysis (BTA)
-    - Cross-Modal Analysis
-    - Optical Processing
-    - SAR Processing
-    - Geospatial Alignment
-
-This module does NOT calculate the final confidence score.
-That responsibility belongs to confidence.py.
-"""
-
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-
-# ============================================================
-# EVIDENCE STRENGTH
-# ============================================================
 
 EVIDENCE_STRENGTH = {
     "strong": 1.0,
@@ -33,31 +10,15 @@ EVIDENCE_STRENGTH = {
 }
 
 
-# ============================================================
-# EVIDENCE GENERATOR
-# ============================================================
-
 class EvidenceGenerator:
-    """
-    Converts model and geospatial outputs into structured
-    evidence for downstream confidence estimation.
-    """
 
     def __init__(self):
 
         self.evidence = []
 
-    # ========================================================
-    # RESET
-    # ========================================================
-
     def reset(self):
 
         self.evidence = []
-
-    # ========================================================
-    # ADD EVIDENCE
-    # ========================================================
 
     def add_evidence(
         self,
@@ -68,9 +29,6 @@ class EvidenceGenerator:
         category: Optional[str] = None,
         supporting_data: Optional[Dict[str, Any]] = None,
     ):
-        """
-        Add one structured evidence item.
-        """
 
         strength = strength.lower().strip()
 
@@ -101,24 +59,10 @@ class EvidenceGenerator:
 
         return item
 
-    # ========================================================
-    # TEXT EXTRACTION
-    # ========================================================
-
     @staticmethod
     def extract_statements(
         text: Any
     ) -> List[str]:
-        """
-        Convert model output into individual evidence
-        statements.
-
-        Handles:
-            - plain strings
-            - lists
-            - dictionaries
-            - None
-        """
 
         if text is None:
 
@@ -128,8 +72,6 @@ class EvidenceGenerator:
             text,
             dict
         ):
-
-            # Prefer answer fields
 
             for key in [
                 "answer",
@@ -144,8 +86,6 @@ class EvidenceGenerator:
                     return EvidenceGenerator.extract_statements(
                         text[key]
                     )
-
-            # Otherwise convert dictionary values
 
             statements = []
 
@@ -189,10 +129,6 @@ class EvidenceGenerator:
 
             return []
 
-        # ----------------------------------------------------
-        # Split common bullet/number formats
-        # ----------------------------------------------------
-
         lines = text.splitlines()
 
         statements = []
@@ -204,8 +140,6 @@ class EvidenceGenerator:
             if not line:
 
                 continue
-
-            # Remove common bullet prefixes
 
             prefixes = [
                 "- ",
@@ -222,8 +156,6 @@ class EvidenceGenerator:
                     ]
 
                     break
-
-            # Remove numbered prefixes
 
             if (
                 len(line) >= 3
@@ -248,25 +180,16 @@ class EvidenceGenerator:
                     line
                 )
 
-        # If there were no line breaks, use the entire answer
-
         if not statements:
 
             statements = [text]
 
         return statements
 
-    # ========================================================
-    # CLASSIFY CATEGORY
-    # ========================================================
-
     @staticmethod
     def classify_category(
         statement: str
     ) -> str:
-        """
-        Estimate an evidence category from the statement.
-        """
 
         text = statement.lower()
 
@@ -360,10 +283,6 @@ class EvidenceGenerator:
 
         return "general"
 
-    # ========================================================
-    # ADD MODEL OUTPUT
-    # ========================================================
-
     def add_model_output(
         self,
         source: str,
@@ -371,9 +290,6 @@ class EvidenceGenerator:
         modality: Optional[str] = None,
         strength: str = "moderate",
     ):
-        """
-        Convert a model output into structured evidence.
-        """
 
         statements = (
             self.extract_statements(
@@ -405,10 +321,6 @@ class EvidenceGenerator:
 
         return added
 
-    # ========================================================
-    # ADD SIA
-    # ========================================================
-
     def add_sia(
         self,
         output
@@ -420,10 +332,6 @@ class EvidenceGenerator:
             modality="optical",
             strength="moderate",
         )
-
-    # ========================================================
-    # ADD BTA
-    # ========================================================
 
     def add_bta(
         self,
@@ -437,10 +345,6 @@ class EvidenceGenerator:
             strength="moderate",
         )
 
-    # ========================================================
-    # ADD CROSS-MODAL
-    # ========================================================
-
     def add_cross_modal(
         self,
         output
@@ -452,10 +356,6 @@ class EvidenceGenerator:
             modality="optical+sar",
             strength="strong",
         )
-
-    # ========================================================
-    # ADD OPTICAL INFORMATION
-    # ========================================================
 
     def add_optical(
         self,
@@ -469,10 +369,6 @@ class EvidenceGenerator:
             strength="moderate",
         )
 
-    # ========================================================
-    # ADD SAR INFORMATION
-    # ========================================================
-
     def add_sar(
         self,
         output
@@ -485,28 +381,14 @@ class EvidenceGenerator:
             strength="moderate",
         )
 
-    # ========================================================
-    # ADD GEOSPATIAL INFORMATION
-    # ========================================================
-
     def add_geospatial(
         self,
         output
     ):
-        """
-        Add geospatial validation information.
-
-        Geospatial alignment is given strong evidence strength
-        when the source and reference are actually aligned.
-        """
 
         if output is None:
 
             return []
-
-        # ----------------------------------------------------
-        # Handle alignment dictionary
-        # ----------------------------------------------------
 
         if isinstance(
             output,
@@ -537,10 +419,6 @@ class EvidenceGenerator:
                     )
                 ]
 
-            # ------------------------------------------------
-            # Generic geospatial result
-            # ------------------------------------------------
-
             return [
                 self.add_evidence(
                     source="Geospatial Alignment",
@@ -562,10 +440,6 @@ class EvidenceGenerator:
             strength="moderate",
         )
 
-    # ========================================================
-    # SOURCE SUMMARY
-    # ========================================================
-
     def source_summary(self):
 
         summary = {}
@@ -584,10 +458,6 @@ class EvidenceGenerator:
 
         return summary
 
-    # ========================================================
-    # CATEGORY SUMMARY
-    # ========================================================
-
     def category_summary(self):
 
         summary = {}
@@ -605,10 +475,6 @@ class EvidenceGenerator:
             summary[category] += 1
 
         return summary
-
-    # ========================================================
-    # MODALITY SUMMARY
-    # ========================================================
 
     def modality_summary(self):
 
@@ -632,19 +498,9 @@ class EvidenceGenerator:
 
         return summary
 
-    # ========================================================
-    # CROSS-MODAL AGREEMENT
-    # ========================================================
-
     def calculate_agreement(
         self
     ):
-        """
-        Estimate whether multiple sources support the same
-        categories.
-
-        This is deliberately simple and transparent.
-        """
 
         category_sources = {}
 
@@ -692,17 +548,10 @@ class EvidenceGenerator:
 
         return agreement
 
-    # ========================================================
-    # BUILD RESULT
-    # ========================================================
-
     def build(
         self,
         query: Optional[str] = None
     ):
-        """
-        Build the complete structured evidence package.
-        """
 
         agreement = (
             self.calculate_agreement()
@@ -732,10 +581,6 @@ class EvidenceGenerator:
 
         return result
 
-    # ========================================================
-    # EXPORT
-    # ========================================================
-
     def to_dict(
         self,
         query: Optional[str] = None
@@ -746,18 +591,10 @@ class EvidenceGenerator:
         )
 
 
-# ============================================================
-# GLOBAL ENGINE
-# ============================================================
-
 evidence_generator = (
     EvidenceGenerator()
 )
 
-
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def generate_evidence(
     query=None,
@@ -768,17 +605,8 @@ def generate_evidence(
     sar=None,
     geospatial=None,
 ):
-    """
-    Generate a complete evidence package.
-
-    All inputs are optional.
-    """
 
     generator = EvidenceGenerator()
-
-    # --------------------------------------------------------
-    # Model outputs
-    # --------------------------------------------------------
 
     if sia is not None:
 
@@ -797,10 +625,6 @@ def generate_evidence(
         generator.add_cross_modal(
             cross_modal
         )
-
-    # --------------------------------------------------------
-    # Processing outputs
-    # --------------------------------------------------------
 
     if optical is not None:
 
@@ -825,19 +649,11 @@ def generate_evidence(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
-
 if __name__ == "__main__":
 
     print(
         "\n========== EVIDENCE GENERATOR TEST =========="
     )
-
-    # --------------------------------------------------------
-    # Example model outputs
-    # --------------------------------------------------------
 
     sia_output = (
         "The image contains roads, buildings, "
@@ -854,10 +670,6 @@ if __name__ == "__main__":
         "built-up structures and roads."
     )
 
-    # --------------------------------------------------------
-    # Example geospatial information
-    # --------------------------------------------------------
-
     geospatial_output = {
         "already_aligned": True,
         "same_crs": True,
@@ -866,10 +678,6 @@ if __name__ == "__main__":
         "same_transform": True,
         "same_bounds": True,
     }
-
-    # --------------------------------------------------------
-    # Generate
-    # --------------------------------------------------------
 
     result = generate_evidence(
         query=(
@@ -881,10 +689,6 @@ if __name__ == "__main__":
         cross_modal=cross_modal_output,
         geospatial=geospatial_output,
     )
-
-    # --------------------------------------------------------
-    # Display
-    # --------------------------------------------------------
 
     print(
         f"\nEvidence count: "

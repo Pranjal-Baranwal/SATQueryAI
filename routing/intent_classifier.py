@@ -1,23 +1,4 @@
-"""
-SATQueryAI Intent Classifier
-============================
 
-Classifies a natural-language satellite imagery query into
-an intent that can be handled by the SATQueryAI Router.
-
-Supported intents:
-
-    single_image_analysis
-    bi_temporal_change
-    cross_modal_analysis
-    sar_analysis
-    optical_sar_analysis
-    image_comparison
-    complex_analysis
-
-This is a lightweight rule-based classifier.
-It does not load any AI model.
-"""
 
 from typing import Dict, List, Tuple, Optional
 
@@ -26,10 +7,6 @@ from routing.state import (
     update_state,
 )
 
-
-# ============================================================
-# INTENT DEFINITIONS
-# ============================================================
 
 SINGLE_IMAGE = "single_image_analysis"
 
@@ -46,9 +23,6 @@ IMAGE_COMPARISON = "image_comparison"
 COMPLEX = "complex_analysis"
 
 
-# ============================================================
-# KEYWORD GROUPS
-# ============================================================
 
 CHANGE_KEYWORDS = [
     "change",
@@ -147,10 +121,6 @@ COMPLEX_KEYWORDS = [
 ]
 
 
-# ============================================================
-# INTENT CLASSIFIER
-# ============================================================
-
 class IntentClassifier:
     """
     Lightweight rule-based intent classifier.
@@ -167,10 +137,6 @@ class IntentClassifier:
             IMAGE_COMPARISON,
             COMPLEX,
         ]
-
-    # ========================================================
-    # NORMALIZE QUERY
-    # ========================================================
 
     @staticmethod
     def normalize_query(
@@ -193,10 +159,6 @@ class IntentClassifier:
             .strip()
         )
 
-    # ========================================================
-    # KEYWORD MATCHING
-    # ========================================================
-
     @staticmethod
     def find_matches(
         query: str,
@@ -217,10 +179,6 @@ class IntentClassifier:
                 )
 
         return matches
-
-    # ========================================================
-    # CLASSIFY
-    # ========================================================
 
     def classify(
         self,
@@ -253,10 +211,6 @@ class IntentClassifier:
                 ),
                 "matched_keywords": [],
             }
-
-        # ----------------------------------------------------
-        # Find keyword matches
-        # ----------------------------------------------------
 
         change_matches = self.find_matches(
             query,
@@ -293,10 +247,6 @@ class IntentClassifier:
             COMPLEX_KEYWORDS
         )
 
-        # ----------------------------------------------------
-        # Flags
-        # ----------------------------------------------------
-
         has_change = bool(
             change_matches
         )
@@ -321,10 +271,6 @@ class IntentClassifier:
             scene_matches
         )
 
-        # ====================================================
-        # RULE 1
-        # TEMPORAL + SAR/OPTICAL
-        # ====================================================
 
         if (
             (has_change or has_temporal)
@@ -348,10 +294,6 @@ class IntentClassifier:
                 ),
             )
 
-        # ====================================================
-        # RULE 2
-        # CHANGE + SAR
-        # ====================================================
 
         if (
             (has_change or has_temporal)
@@ -372,10 +314,6 @@ class IntentClassifier:
                 ),
             )
 
-        # ====================================================
-        # RULE 3
-        # CHANGE + OPTICAL
-        # ====================================================
 
         if (
             (has_change or has_temporal)
@@ -396,11 +334,6 @@ class IntentClassifier:
                 ),
             )
 
-        # ====================================================
-        # RULE 4
-        # EXPLICIT T1/T2 CHANGE
-        # ====================================================
-
         if (
             has_change
             and has_temporal
@@ -418,11 +351,6 @@ class IntentClassifier:
                     + temporal_matches
                 ),
             )
-
-        # ====================================================
-        # RULE 5
-        # TWO IMAGES / COMPARISON
-        # ====================================================
 
         if (
             has_temporal
@@ -444,11 +372,6 @@ class IntentClassifier:
                 ),
             )
 
-        # ====================================================
-        # RULE 6
-        # OPTICAL + SAR
-        # ====================================================
-
         if (
             has_sar
             and has_optical
@@ -467,11 +390,6 @@ class IntentClassifier:
                 ),
             )
 
-        # ====================================================
-        # RULE 7
-        # SAR ONLY
-        # ====================================================
-
         if has_sar:
 
             return self._result(
@@ -484,10 +402,6 @@ class IntentClassifier:
                 matches=sar_matches,
             )
 
-        # ====================================================
-        # RULE 8
-        # OBJECT / SCENE ANALYSIS
-        # ====================================================
 
         if (
             has_objects
@@ -507,12 +421,6 @@ class IntentClassifier:
                     + scene_matches
                 ),
             )
-
-        # ====================================================
-        # RULE 9
-        # DEFAULT
-        # ====================================================
-
         return self._result(
             intent=SINGLE_IMAGE,
             confidence=0.55,
@@ -523,10 +431,6 @@ class IntentClassifier:
             ),
             matches=[],
         )
-
-    # ========================================================
-    # RESULT BUILDER
-    # ========================================================
 
     @staticmethod
     def _result(
@@ -549,10 +453,6 @@ class IntentClassifier:
                 )
             ),
         }
-
-    # ========================================================
-    # CLASSIFY STATE
-    # ========================================================
 
     def classify_state(
         self,
@@ -601,9 +501,6 @@ class IntentClassifier:
             },
         )
 
-    # ========================================================
-    # PREDICT
-    # ========================================================
 
     def predict(
         self,
@@ -620,18 +517,10 @@ class IntentClassifier:
         ]
 
 
-# ============================================================
-# GLOBAL CLASSIFIER
-# ============================================================
 
 intent_classifier = (
     IntentClassifier()
 )
-
-
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def classify_intent(
     query: str
@@ -651,9 +540,6 @@ def classify_state(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -663,17 +549,11 @@ if __name__ == "__main__":
 
     test_queries = [
 
-        # ----------------------------------------------------
-        # SIA
-        # ----------------------------------------------------
 
         "What objects are visible in this satellite image?",
 
         "Describe the land cover in this image.",
 
-        # ----------------------------------------------------
-        # BTA
-        # ----------------------------------------------------
 
         "What changed between T1 and T2?",
 
@@ -681,23 +561,13 @@ if __name__ == "__main__":
 
         "Has construction increased between the two images?",
 
-        # ----------------------------------------------------
-        # SAR
-        # ----------------------------------------------------
-
         "What does the SAR image show?",
 
-        # ----------------------------------------------------
-        # Optical + SAR
-        # ----------------------------------------------------
 
         "Analyze the optical and SAR imagery together.",
 
         "What information can we get by combining optical and radar data?",
 
-        # ----------------------------------------------------
-        # Complex
-        # ----------------------------------------------------
 
         "What changed between T1 and T2 and what do the "
         "optical and SAR images indicate?",

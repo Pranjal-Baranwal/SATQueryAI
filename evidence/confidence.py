@@ -21,24 +21,12 @@ Example:
 
 
 from typing import Any, Dict, List, Optional
-
-
-# ============================================================
-# STRENGTH SCORES
-# ============================================================
-
 STRENGTH_SCORES = {
     "strong": 1.0,
     "moderate": 0.7,
     "weak": 0.4,
     "unknown": 0.0,
 }
-
-
-# ============================================================
-# CONFIDENCE WEIGHTS
-# ============================================================
-
 WEIGHTS = {
     "evidence_strength": 0.35,
     "source_agreement": 0.25,
@@ -46,12 +34,6 @@ WEIGHTS = {
     "geospatial_validation": 0.10,
     "source_diversity": 0.10,
 }
-
-
-# ============================================================
-# CONFIDENCE ESTIMATOR
-# ============================================================
-
 class ConfidenceEstimator:
     """
     Estimates confidence from structured evidence.
@@ -70,10 +52,6 @@ class ConfidenceEstimator:
 
         self._validate_weights()
 
-    # ========================================================
-    # VALIDATE WEIGHTS
-    # ========================================================
-
     def _validate_weights(self):
 
         total = sum(
@@ -86,10 +64,6 @@ class ConfidenceEstimator:
                 "Confidence weights must sum to 1.0. "
                 f"Current total: {total}"
             )
-
-    # ========================================================
-    # EVIDENCE STRENGTH
-    # ========================================================
 
     @staticmethod
     def calculate_evidence_strength(
@@ -133,10 +107,6 @@ class ConfidenceEstimator:
             /
             len(scores)
         )
-
-    # ========================================================
-    # SOURCE AGREEMENT
-    # ========================================================
 
     @staticmethod
     def calculate_source_agreement(
@@ -227,10 +197,6 @@ class ConfidenceEstimator:
             len(scores)
         )
 
-    # ========================================================
-    # MODALITY AGREEMENT
-    # ========================================================
-
     @staticmethod
     def calculate_modality_agreement(
         evidence: List[Dict[str, Any]]
@@ -316,41 +282,21 @@ class ConfidenceEstimator:
                 for m in modalities
             )
 
-            # ------------------------------------------------
-            # Optical + SAR
-            # ------------------------------------------------
-
             if has_optical and has_sar:
 
                 score = 1.0
-
-            # ------------------------------------------------
-            # Optical + Temporal
-            # ------------------------------------------------
 
             elif has_optical and has_temporal:
 
                 score = 0.85
 
-            # ------------------------------------------------
-            # SAR + Temporal
-            # ------------------------------------------------
-
             elif has_sar and has_temporal:
 
                 score = 0.85
 
-            # ------------------------------------------------
-            # Multiple modalities
-            # ------------------------------------------------
-
             elif len(modalities) >= 2:
 
                 score = 0.75
-
-            # ------------------------------------------------
-            # Single modality
-            # ------------------------------------------------
 
             elif len(modalities) == 1:
 
@@ -372,10 +318,6 @@ class ConfidenceEstimator:
             /
             len(scores)
         )
-
-    # ========================================================
-    # GEOSPATIAL VALIDATION
-    # ========================================================
 
     @staticmethod
     def calculate_geospatial_validation(
@@ -443,11 +385,6 @@ class ConfidenceEstimator:
         return max(
             scores
         )
-
-    # ========================================================
-    # SOURCE DIVERSITY
-    # ========================================================
-
     @staticmethod
     def calculate_source_diversity(
         evidence: List[Dict[str, Any]]
@@ -507,10 +444,6 @@ class ConfidenceEstimator:
 
         return 0.0
 
-    # ========================================================
-    # CONFIDENCE LEVEL
-    # ========================================================
-
     @staticmethod
     def confidence_level(
         score: float
@@ -538,10 +471,6 @@ class ConfidenceEstimator:
             return "Low"
 
         return "Very Low"
-
-    # ========================================================
-    # MAIN CALCULATION
-    # ========================================================
 
     def calculate(
         self,
@@ -577,10 +506,6 @@ class ConfidenceEstimator:
                 "'evidence' must be a list."
             )
 
-        # ----------------------------------------------------
-        # Calculate components
-        # ----------------------------------------------------
-
         evidence_strength = (
             self.calculate_evidence_strength(
                 evidence
@@ -610,11 +535,6 @@ class ConfidenceEstimator:
                 evidence
             )
         )
-
-        # ----------------------------------------------------
-        # Weighted confidence
-        # ----------------------------------------------------
-
         weighted_score = (
 
             evidence_strength
@@ -655,11 +575,6 @@ class ConfidenceEstimator:
                 "source_diversity"
             ]
         )
-
-        # ----------------------------------------------------
-        # Clamp to valid range
-        # ----------------------------------------------------
-
         weighted_score = max(
             0.0,
             min(
@@ -667,10 +582,6 @@ class ConfidenceEstimator:
                 weighted_score
             )
         )
-
-        # ----------------------------------------------------
-        # Normalized confidence
-        # ----------------------------------------------------
 
         confidence_score = round(
             weighted_score,
@@ -682,10 +593,6 @@ class ConfidenceEstimator:
                 weighted_score
             )
         )
-
-        # ----------------------------------------------------
-        # Return result
-        # ----------------------------------------------------
 
         return {
 
@@ -741,10 +648,6 @@ class ConfidenceEstimator:
                 ),
         }
 
-    # ========================================================
-    # INTERPRETATION
-    # ========================================================
-
     @staticmethod
     def generate_interpretation(
         score: float,
@@ -789,11 +692,6 @@ class ConfidenceEstimator:
             "The available evidence is insufficient "
             "to support a reliable conclusion."
         )
-
-    # ========================================================
-    # ESTIMATE
-    # ========================================================
-
     def estimate(
         self,
         evidence_package: Dict[str, Any]
@@ -803,19 +701,10 @@ class ConfidenceEstimator:
             evidence_package
         )
 
-
-# ============================================================
-# GLOBAL ENGINE
-# ============================================================
-
 confidence_engine = (
     ConfidenceEstimator()
 )
 
-
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def calculate_confidence(
     evidence_package: Dict[str, Any]
@@ -826,19 +715,12 @@ def calculate_confidence(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
-
 if __name__ == "__main__":
 
     print(
         "\n========== CONFIDENCE TEST =========="
     )
 
-    # --------------------------------------------------------
-    # Example evidence
-    # --------------------------------------------------------
 
     example_evidence = {
 
@@ -913,17 +795,9 @@ if __name__ == "__main__":
         ]
     }
 
-    # --------------------------------------------------------
-    # Calculate confidence
-    # --------------------------------------------------------
-
     result = calculate_confidence(
         example_evidence
     )
-
-    # --------------------------------------------------------
-    # Display
-    # --------------------------------------------------------
 
     print(
         f"\nConfidence Score: "

@@ -1,18 +1,3 @@
-"""
-Prompt templates for Bi-Temporal Analysis (BTA).
-
-BTA compares two satellite images of the same area captured
-at different points in time.
-
-Image 1 = T1 (earlier)
-Image 2 = T2 (later)
-"""
-
-
-# ============================================================
-# SYSTEM PROMPT
-# ============================================================
-
 SYSTEM_PROMPT = """
 You are an expert remote-sensing analyst specializing in
 bi-temporal satellite image analysis and change detection.
@@ -47,9 +32,6 @@ Follow these rules:
 """
 
 
-# ============================================================
-# GENERAL BTA
-# ============================================================
 
 GENERAL_BTA_PROMPT = """
 Compare the two satellite images provided.
@@ -80,10 +62,6 @@ User question:
 {query}
 """
 
-
-# ============================================================
-# CHANGE DETECTION
-# ============================================================
 
 CHANGE_DETECTION_PROMPT = """
 Perform a detailed visual change-detection analysis between
@@ -125,10 +103,6 @@ land-cover changes.
 """
 
 
-# ============================================================
-# URBAN CHANGE
-# ============================================================
-
 URBAN_CHANGE_PROMPT = """
 Compare T1 and T2 specifically for urban and built-environment
 changes.
@@ -160,10 +134,6 @@ Only report changes supported by visible evidence.
 """
 
 
-# ============================================================
-# VEGETATION CHANGE
-# ============================================================
-
 VEGETATION_CHANGE_PROMPT = """
 Compare T1 and T2 for vegetation-related changes.
 
@@ -194,10 +164,6 @@ supports a real spatial change.
 """
 
 
-# ============================================================
-# WATER CHANGE
-# ============================================================
-
 WATER_CHANGE_PROMPT = """
 Compare T1 and T2 for changes involving water.
 
@@ -227,9 +193,6 @@ with water.
 """
 
 
-# ============================================================
-# INFRASTRUCTURE CHANGE
-# ============================================================
 
 INFRASTRUCTURE_CHANGE_PROMPT = """
 Compare T1 and T2 for infrastructure-related changes.
@@ -261,10 +224,6 @@ infrastructure changes.
 """
 
 
-# ============================================================
-# ENVIRONMENTAL CHANGE
-# ============================================================
-
 ENVIRONMENTAL_CHANGE_PROMPT = """
 Compare T1 and T2 for environmentally significant changes.
 
@@ -294,10 +253,6 @@ Do not make claims that cannot be supported by the imagery.
 """
 
 
-# ============================================================
-# CHANGE SUMMARY
-# ============================================================
-
 CHANGE_SUMMARY_PROMPT = """
 Compare T1 and T2 and provide a concise summary of the
 most important changes.
@@ -324,10 +279,6 @@ End with an overall assessment of whether the area shows:
 Do not exaggerate uncertain differences.
 """
 
-
-# ============================================================
-# NO-CHANGE VERIFICATION
-# ============================================================
 
 NO_CHANGE_VERIFICATION_PROMPT = """
 Compare T1 and T2 carefully and determine whether there are
@@ -361,9 +312,6 @@ If changes are visible, describe them and provide confidence.
 """
 
 
-# ============================================================
-# GENERAL PROMPT BUILDER
-# ============================================================
 
 def build_general_prompt(query):
     """
@@ -378,11 +326,6 @@ def build_general_prompt(query):
     return GENERAL_BTA_PROMPT.format(
         query=query.strip()
     )
-
-
-# ============================================================
-# CHANGE DETECTION PROMPT BUILDER
-# ============================================================
 
 def build_change_detection_prompt(query=None):
     """
@@ -400,11 +343,6 @@ Additional user question:
 """
 
     return prompt
-
-
-# ============================================================
-# URBAN PROMPT BUILDER
-# ============================================================
 
 def build_urban_change_prompt(query=None):
     """
@@ -424,9 +362,6 @@ Additional user question:
     return prompt
 
 
-# ============================================================
-# VEGETATION PROMPT BUILDER
-# ============================================================
 
 def build_vegetation_change_prompt(query=None):
     """
@@ -444,11 +379,6 @@ Additional user question:
 """
 
     return prompt
-
-
-# ============================================================
-# WATER PROMPT BUILDER
-# ============================================================
 
 def build_water_change_prompt(query=None):
     """
@@ -468,9 +398,6 @@ Additional user question:
     return prompt
 
 
-# ============================================================
-# INFRASTRUCTURE PROMPT BUILDER
-# ============================================================
 
 def build_infrastructure_change_prompt(query=None):
     """
@@ -490,9 +417,6 @@ Additional user question:
     return prompt
 
 
-# ============================================================
-# ENVIRONMENTAL PROMPT BUILDER
-# ============================================================
 
 def build_environmental_change_prompt(query=None):
     """
@@ -512,9 +436,6 @@ Additional user question:
     return prompt
 
 
-# ============================================================
-# SUMMARY PROMPT BUILDER
-# ============================================================
 
 def build_change_summary_prompt():
     """
@@ -524,9 +445,6 @@ def build_change_summary_prompt():
     return CHANGE_SUMMARY_PROMPT
 
 
-# ============================================================
-# NO-CHANGE PROMPT BUILDER
-# ============================================================
 
 def build_no_change_verification_prompt():
     """

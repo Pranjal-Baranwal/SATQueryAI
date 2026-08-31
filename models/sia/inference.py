@@ -24,16 +24,9 @@ from models.sia.prompts import (
 )
 
 
-# ============================================================
-# ENVIRONMENT
-# ============================================================
-
 load_dotenv()
 
 
-# ============================================================
-# MODEL CONFIGURATION
-# ============================================================
 
 MODEL_ID = os.getenv(
     "SIA_MODEL_ID",
@@ -45,9 +38,6 @@ CUDA_AVAILABLE = torch.cuda.is_available()
 DEVICE = "cuda" if CUDA_AVAILABLE else "cpu"
 
 
-# ============================================================
-# 4-BIT QUANTIZATION CONFIGURATION
-# ============================================================
 
 QUANTIZATION_CONFIG = None
 
@@ -61,9 +51,6 @@ if CUDA_AVAILABLE:
     )
 
 
-# ============================================================
-# SIA INFERENCE ENGINE
-# ============================================================
 
 class SIAInference:
     """
@@ -87,9 +74,6 @@ class SIAInference:
 
         self.loaded = False
 
-    # ========================================================
-    # MODEL LOADING
-    # ========================================================
 
     def load_model(self):
         """
@@ -113,18 +97,12 @@ class SIAInference:
             f"Device: {self.device}"
         )
 
-        # ----------------------------------------------------
-        # Processor
-        # ----------------------------------------------------
 
         self.processor = AutoProcessor.from_pretrained(
             self.model_id,
             trust_remote_code=True
         )
 
-        # ----------------------------------------------------
-        # CUDA / GPU
-        # ----------------------------------------------------
 
         if self.device == "cuda":
 
@@ -153,9 +131,6 @@ class SIAInference:
                 )
             )
 
-        # ----------------------------------------------------
-        # CPU fallback
-        # ----------------------------------------------------
 
         else:
 
@@ -177,10 +152,6 @@ class SIAInference:
                 )
             )
 
-        # ----------------------------------------------------
-        # Evaluation mode
-        # ----------------------------------------------------
-
         self.model.eval()
 
         self.loaded = True
@@ -189,9 +160,6 @@ class SIAInference:
             "\nSIA model loaded successfully."
         )
 
-    # ========================================================
-    # IMAGE VALIDATION
-    # ========================================================
 
     @staticmethod
     def validate_image(image_path):
@@ -225,10 +193,6 @@ class SIAInference:
 
         return image_path
 
-    # ========================================================
-    # IMAGE LOADING
-    # ========================================================
-
     @staticmethod
     def load_image(image_path):
 
@@ -245,10 +209,6 @@ class SIAInference:
         )
 
         return image
-
-    # ========================================================
-    # PROMPT SELECTION
-    # ========================================================
 
     @staticmethod
     def build_prompt(
@@ -315,9 +275,6 @@ class SIAInference:
                 f"{analysis_type}"
             )
 
-    # ========================================================
-    # MESSAGE CREATION
-    # ========================================================
 
     @staticmethod
     def create_messages(prompt):
@@ -346,10 +303,6 @@ class SIAInference:
             }
         ]
 
-    # ========================================================
-    # INFERENCE
-    # ========================================================
-
     def analyze(
         self,
         image_path,
@@ -368,40 +321,24 @@ class SIAInference:
                 "Query cannot be empty."
             )
 
-        # ----------------------------------------------------
-        # Load model
-        # ----------------------------------------------------
-
         self.load_model()
 
-        # ----------------------------------------------------
-        # Load image
-        # ----------------------------------------------------
 
         image = self.load_image(
             image_path
         )
 
-        # ----------------------------------------------------
-        # Build prompt
-        # ----------------------------------------------------
 
         prompt = self.build_prompt(
             query=query,
             analysis_type=analysis_type
         )
 
-        # ----------------------------------------------------
-        # Create messages
-        # ----------------------------------------------------
 
         messages = self.create_messages(
             prompt
         )
 
-        # ----------------------------------------------------
-        # Apply chat template
-        # ----------------------------------------------------
 
         text = self.processor.apply_chat_template(
             messages,
@@ -409,9 +346,6 @@ class SIAInference:
             add_generation_prompt=True
         )
 
-        # ----------------------------------------------------
-        # Prepare inputs
-        # ----------------------------------------------------
 
         inputs = self.processor(
             text=[text],
@@ -419,10 +353,6 @@ class SIAInference:
             padding=True,
             return_tensors="pt"
         )
-
-        # ----------------------------------------------------
-        # Move inputs to model device
-        # ----------------------------------------------------
 
         if self.device == "cuda":
 
@@ -442,9 +372,6 @@ class SIAInference:
                 for key, value in inputs.items()
             }
 
-        # ----------------------------------------------------
-        # Generate
-        # ----------------------------------------------------
 
         print(
             "\nGenerating SIA response..."
@@ -465,9 +392,6 @@ class SIAInference:
                 **generation_kwargs
             )
 
-        # ----------------------------------------------------
-        # Remove input tokens
-        # ----------------------------------------------------
 
         input_token_length = (
             inputs["input_ids"].shape[1]
@@ -478,9 +402,6 @@ class SIAInference:
             input_token_length:
         ]
 
-        # ----------------------------------------------------
-        # Decode
-        # ----------------------------------------------------
 
         answer = self.processor.batch_decode(
             generated_ids,
@@ -490,9 +411,6 @@ class SIAInference:
 
         answer = answer.strip()
 
-        # ----------------------------------------------------
-        # GPU memory information
-        # ----------------------------------------------------
 
         gpu_memory = None
 
@@ -503,11 +421,6 @@ class SIAInference:
                 / (1024 ** 3),
                 2
             )
-
-        # ----------------------------------------------------
-        # Return result
-        # ----------------------------------------------------
-
         return {
             "model": self.model_id,
             "analysis_type": analysis_type,
@@ -517,9 +430,6 @@ class SIAInference:
             "gpu_memory_gb": gpu_memory
         }
 
-    # ========================================================
-    # SIMPLE ASK FUNCTION
-    # ========================================================
 
     def ask(
         self,
@@ -535,9 +445,6 @@ class SIAInference:
 
         return result["answer"]
 
-    # ========================================================
-    # STATUS
-    # ========================================================
 
     def status(self):
 
@@ -548,9 +455,6 @@ class SIAInference:
             "loaded": self.loaded
         }
 
-    # ========================================================
-    # UNLOAD MODEL
-    # ========================================================
 
     def unload_model(self):
 
@@ -575,16 +479,9 @@ class SIAInference:
         )
 
 
-# ============================================================
-# GLOBAL SIA ENGINE
-# ============================================================
 
 sia_engine = SIAInference()
 
-
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def analyze_image(
     image_path,
@@ -598,10 +495,6 @@ def analyze_image(
         analysis_type=analysis_type
     )
 
-
-# ============================================================
-# ROUTING GRAPH INTERFACE
-# ============================================================
 
 def run_sia(
     image_path,
@@ -621,9 +514,6 @@ def run_sia(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 

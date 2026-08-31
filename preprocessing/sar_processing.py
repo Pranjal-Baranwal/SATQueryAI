@@ -6,21 +6,6 @@ from PIL import Image
 
 
 class SARProcessor:
-    """
-    Processing utilities for SAR satellite imagery.
-
-    Designed primarily for Sentinel-1 style SAR data.
-
-    Supports:
-        - VV / VH band extraction
-        - Linear to dB conversion
-        - dB to linear conversion
-        - SAR normalization
-        - VV/VH ratio
-        - VV-VH difference
-        - SAR visualization
-        - GeoTIFF export
-    """
 
     def __init__(self, file_path):
         self.file_path = Path(file_path)
@@ -44,9 +29,6 @@ class SARProcessor:
 
         self._load()
 
-    # =========================================================
-    # LOAD DATA
-    # =========================================================
 
     def _load(self):
         """Load the SAR GeoTIFF into memory."""
@@ -65,9 +47,6 @@ class SARProcessor:
 
             self.transform = src.transform
 
-    # =========================================================
-    # BAND OPERATIONS
-    # =========================================================
 
     def get_band(self, band_number):
         """
@@ -89,31 +68,12 @@ class SARProcessor:
 
         return self.band_count
 
-    # =========================================================
-    # LINEAR TO DECIBEL
-    # =========================================================
 
     @staticmethod
     def linear_to_db(
         power,
         min_power=1e-10
     ):
-        """
-        Convert SAR power/intensity from linear scale
-        to decibels.
-
-        Formula:
-
-            dB = 10 * log10(power)
-
-        Parameters
-        ----------
-        power : numpy.ndarray
-            SAR intensity/power values.
-
-        min_power : float
-            Small positive value used to avoid log(0).
-        """
 
         power = np.asarray(
             power,
@@ -129,19 +89,9 @@ class SARProcessor:
 
         return db
 
-    # =========================================================
-    # DECIBEL TO LINEAR
-    # =========================================================
 
     @staticmethod
     def db_to_linear(db):
-        """
-        Convert SAR decibel values back to linear power.
-
-        Formula:
-
-            power = 10 ^ (dB / 10)
-        """
 
         db = np.asarray(
             db,
@@ -153,9 +103,6 @@ class SARProcessor:
             db / 10.0
         )
 
-    # =========================================================
-    # NORMALIZATION
-    # =========================================================
 
     @staticmethod
     def normalize(
@@ -219,30 +166,12 @@ class SARProcessor:
             normalized * 255
         ).astype(np.uint8)
 
-    # =========================================================
-    # VV / VH
-    # =========================================================
 
     def get_vv(
         self,
         band_number=1,
         input_scale="linear"
     ):
-        """
-        Get VV polarization.
-
-        Parameters
-        ----------
-        band_number : int
-            Band containing VV.
-
-        input_scale : str
-            "linear" or "db"
-
-        Returns
-        -------
-        numpy.ndarray
-        """
 
         vv = self.get_band(
             band_number
@@ -299,9 +228,6 @@ class SARProcessor:
                 "'linear' or 'db'"
             )
 
-    # =========================================================
-    # VV / VH RATIO
-    # =========================================================
 
     def calculate_vv_vh_ratio(
         self,
@@ -343,9 +269,6 @@ class SARProcessor:
 
         return ratio
 
-    # =========================================================
-    # VV - VH DIFFERENCE
-    # =========================================================
 
     def calculate_vv_vh_difference(
         self,
@@ -388,23 +311,12 @@ class SARProcessor:
 
         return difference
 
-    # =========================================================
-    # CREATE SAR VISUALIZATION
-    # =========================================================
 
     def create_sar_image(
         self,
         band_number=1,
         input_scale="linear"
     ):
-        """
-        Convert a SAR band into an 8-bit grayscale image.
-
-        Useful for:
-            - visualization
-            - VLM input
-            - debugging
-        """
 
         if input_scale.lower() == "linear":
 
@@ -432,10 +344,6 @@ class SARProcessor:
         return self.normalize(
             band
         )
-
-    # =========================================================
-    # CREATE RGB-LIKE SAR IMAGE
-    # =========================================================
 
     def create_pseudo_rgb(
         self,
@@ -501,9 +409,6 @@ class SARProcessor:
 
         return pseudo_rgb
 
-    # =========================================================
-    # SAVE IMAGE
-    # =========================================================
 
     @staticmethod
     def save_image(
@@ -544,10 +449,6 @@ class SARProcessor:
         )
 
         return str(output_path)
-
-    # =========================================================
-    # SAVE GeoTIFF
-    # =========================================================
 
     def save_geotiff(
         self,
@@ -597,9 +498,6 @@ class SARProcessor:
 
         return str(output_path)
 
-    # =========================================================
-    # INFORMATION
-    # =========================================================
 
     def print_info(self):
         """Print SAR raster information and statistics."""
@@ -664,10 +562,6 @@ class SARProcessor:
         )
 
 
-# =============================================================
-# CONVENIENCE FUNCTIONS
-# =============================================================
-
 def linear_to_db(power):
     """
     Convenience function for linear → dB conversion.
@@ -687,10 +581,6 @@ def db_to_linear(db):
         db
     )
 
-
-# =============================================================
-# TEST
-# =============================================================
 
 if __name__ == "__main__":
 
@@ -714,11 +604,6 @@ if __name__ == "__main__":
             f"{processor.get_band_count()}"
         )
 
-        # -----------------------------------------------------
-        # Only create a SAR visualization for the first band.
-        #
-        # This is safe for your current one-band Sample.tif.
-        # -----------------------------------------------------
 
         sar_image = processor.create_sar_image(
             band_number=1,

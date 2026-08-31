@@ -1,27 +1,4 @@
-"""
-SATQueryAI Router
-=================
 
-Determines which SATQueryAI model(s) should handle a request
-based on the intent produced by intent_classifier.py.
-
-Routes:
-
-    SIA
-        Single Image Analysis
-
-    BTA
-        Bi-Temporal Analysis
-
-    Cross-Modal
-        Optical + SAR Analysis
-
-    BTA + Cross-Modal
-        Complex temporal + multi-modal analysis
-
-The router does NOT load or execute models.
-It only determines the execution route.
-"""
 
 from typing import Any, Dict, List
 
@@ -31,24 +8,14 @@ from routing.state import (
 )
 
 
-# ============================================================
-# ROUTE DEFINITIONS
-# ============================================================
-
 SIA = "SIA"
 BTA = "BTA"
 CROSS_MODAL = "Cross-Modal"
 
 
-# ============================================================
-# INTENT → ROUTE MAPPING
-# ============================================================
 
 INTENT_ROUTES = {
 
-    # --------------------------------------------------------
-    # Single image analysis
-    # --------------------------------------------------------
 
     "single_image_analysis": [
         SIA
@@ -70,10 +37,6 @@ INTENT_ROUTES = {
         SIA
     ],
 
-    # --------------------------------------------------------
-    # Bi-temporal analysis
-    # --------------------------------------------------------
-
     "bi_temporal_change": [
         BTA
     ],
@@ -90,9 +53,6 @@ INTENT_ROUTES = {
         BTA
     ],
 
-    # --------------------------------------------------------
-    # Cross-modal analysis
-    # --------------------------------------------------------
 
     "cross_modal_analysis": [
         CROSS_MODAL
@@ -110,9 +70,6 @@ INTENT_ROUTES = {
         CROSS_MODAL
     ],
 
-    # --------------------------------------------------------
-    # Complex analysis
-    # --------------------------------------------------------
 
     "complex_analysis": [
         BTA,
@@ -121,9 +78,6 @@ INTENT_ROUTES = {
 }
 
 
-# ============================================================
-# ROUTER
-# ============================================================
 
 class Router:
     """
@@ -138,10 +92,6 @@ class Router:
         self.intent_routes = (
             INTENT_ROUTES.copy()
         )
-
-    # ========================================================
-    # GET ROUTE
-    # ========================================================
 
     def get_route(
         self,
@@ -172,11 +122,6 @@ class Router:
             return [SIA]
 
         return list(route)
-
-    # ========================================================
-    # ROUTING CONFIDENCE
-    # ========================================================
-
     def calculate_routing_confidence(
         self,
         state: RoutingState,
@@ -213,10 +158,6 @@ class Router:
 
             intent_confidence = 0.5
 
-        # ----------------------------------------------------
-        # Clamp confidence
-        # ----------------------------------------------------
-
         intent_confidence = max(
             0.0,
             min(
@@ -225,13 +166,9 @@ class Router:
             )
         )
 
-        # ----------------------------------------------------
-        # Input validation
-        # ----------------------------------------------------
 
         input_bonus = 0.0
 
-        # BTA requires two temporal images
 
         if BTA in routes:
 
@@ -255,7 +192,6 @@ class Router:
 
                 input_bonus = -0.15
 
-        # Cross-modal requires optical + SAR
 
         elif CROSS_MODAL in routes:
 
@@ -279,7 +215,6 @@ class Router:
 
                 input_bonus = -0.15
 
-        # SIA requires at least one image
 
         elif SIA in routes:
 
@@ -323,9 +258,6 @@ class Router:
             4
         )
 
-    # ========================================================
-    # ROUTING REASON
-    # ========================================================
 
     def generate_reason(
         self,
@@ -382,10 +314,6 @@ class Router:
             f"{', '.join(routes)}."
         )
 
-    # ========================================================
-    # ROUTE STATE
-    # ========================================================
-
     def route_state(
         self,
         state: RoutingState
@@ -398,17 +326,11 @@ class Router:
             "intent"
         )
 
-        # ----------------------------------------------------
-        # Determine route
-        # ----------------------------------------------------
 
         routes = self.get_route(
             intent
         )
 
-        # ----------------------------------------------------
-        # Calculate confidence
-        # ----------------------------------------------------
 
         routing_confidence = (
             self.calculate_routing_confidence(
@@ -417,9 +339,6 @@ class Router:
             )
         )
 
-        # ----------------------------------------------------
-        # Generate reason
-        # ----------------------------------------------------
 
         routing_reason = (
             self.generate_reason(
@@ -428,15 +347,8 @@ class Router:
             )
         )
 
-        # ----------------------------------------------------
-        # Primary route
-        # ----------------------------------------------------
 
         primary_route = routes[0]
-
-        # ----------------------------------------------------
-        # Update state
-        # ----------------------------------------------------
 
         return update_state(
             state,
@@ -454,10 +366,6 @@ class Router:
             ),
         )
 
-    # ========================================================
-    # ROUTE QUERY
-    # ========================================================
-
     def route_query(
         self,
         state: RoutingState
@@ -471,16 +379,10 @@ class Router:
         )
 
 
-# ============================================================
-# GLOBAL ROUTER
-# ============================================================
 
 router = Router()
 
 
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def route_request(
     state: RoutingState
@@ -494,19 +396,12 @@ def route_request(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
-
 if __name__ == "__main__":
 
     print(
         "\n========== ROUTER TEST =========="
     )
 
-    # --------------------------------------------------------
-    # Test 1: Single image
-    # --------------------------------------------------------
 
     print(
         "\n--- Test 1: SIA ---"
@@ -566,9 +461,6 @@ if __name__ == "__main__":
         ]
     )
 
-    # --------------------------------------------------------
-    # Test 2: BTA
-    # --------------------------------------------------------
 
     print(
         "\n--- Test 2: BTA ---"
@@ -632,10 +524,6 @@ if __name__ == "__main__":
         ]
     )
 
-    # --------------------------------------------------------
-    # Test 3: Cross-Modal
-    # --------------------------------------------------------
-
     print(
         "\n--- Test 3: Cross-Modal ---"
     )
@@ -697,10 +585,6 @@ if __name__ == "__main__":
             "routing_reason"
         ]
     )
-
-    # --------------------------------------------------------
-    # Test 4: Complex
-    # --------------------------------------------------------
 
     print(
         "\n--- Test 4: Complex ---"

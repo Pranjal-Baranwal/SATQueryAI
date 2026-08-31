@@ -1,41 +1,4 @@
-"""
-SATQueryAI - Main Application
-=============================
 
-Main backend entry point for SATQueryAI.
-
-Pipeline:
-
-    User Query
-         |
-         v
-    Intent Classifier
-         |
-         v
-       Router
-         |
-         +-------------------+
-         |                   |
-         v                   v
-        SIA                 BTA
-         |                   |
-         +---------+---------+
-                   |
-                   v
-             Cross-Modal
-                   |
-                   v
-              Geospatial
-                   |
-                   v
-           Evidence Generator
-                   |
-                   v
-              Confidence
-                   |
-                   v
-             Final Response
-"""
 
 import os
 import time
@@ -44,9 +7,6 @@ from typing import Optional, Dict, Any
 from routing.graph import run_pipeline
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
 DEFAULT_T1_PATH = "data/input/T1.png"
 DEFAULT_T2_PATH = "data/input/T2.png"
@@ -54,9 +14,6 @@ DEFAULT_OPTICAL_PATH = "data/input/T1.png"
 DEFAULT_SAR_PATH = "data/input/Sample.tif"
 
 
-# ============================================================
-# SATQUERYAI APPLICATION
-# ============================================================
 
 class SATQueryAI:
     """
@@ -72,10 +29,6 @@ class SATQueryAI:
             "SATQueryAI initialized."
         )
 
-    # ========================================================
-    # PROCESS QUERY
-    # ========================================================
-
     def process_query(
         self,
         query: str,
@@ -90,9 +43,6 @@ class SATQueryAI:
         routing pipeline.
         """
 
-        # ----------------------------------------------------
-        # Validate query
-        # ----------------------------------------------------
 
         if not query:
 
@@ -110,9 +60,6 @@ class SATQueryAI:
                 "error": "Query cannot be empty.",
             }
 
-        # ----------------------------------------------------
-        # Execute pipeline
-        # ----------------------------------------------------
 
         try:
 
@@ -148,10 +95,6 @@ class SATQueryAI:
                 ).__name__,
             }
 
-    # ========================================================
-    # FORMAT RESPONSE
-    # ========================================================
-
     @staticmethod
     def format_response(
         state
@@ -166,9 +109,6 @@ class SATQueryAI:
             []
         )
 
-        # ----------------------------------------------------
-        # Pipeline error
-        # ----------------------------------------------------
 
         if state.get(
             "error"
@@ -208,26 +148,13 @@ class SATQueryAI:
                 "state": state,
             }
 
-        # ----------------------------------------------------
-        # Successful response
-        # ----------------------------------------------------
 
         return {
 
             "success": True,
-
-            # =================================================
-            # QUERY
-            # =================================================
-
             "query": state.get(
                 "query"
             ),
-
-            # =================================================
-            # INTENT
-            # =================================================
-
             "intent": state.get(
                 "intent"
             ),
@@ -240,9 +167,6 @@ class SATQueryAI:
                 "intent_reason"
             ),
 
-            # =================================================
-            # ROUTING
-            # =================================================
 
             "route": state.get(
                 "route"
@@ -261,18 +185,11 @@ class SATQueryAI:
                 "routing_reason"
             ),
 
-            # =================================================
-            # MODEL EXECUTION
-            # =================================================
 
             "executed_models": state.get(
                 "executed_models",
                 []
             ),
-
-            # =================================================
-            # SIA
-            # =================================================
 
             "sia_answer": state.get(
                 "sia_answer"
@@ -282,9 +199,6 @@ class SATQueryAI:
                 "sia_result"
             ),
 
-            # =================================================
-            # BTA
-            # =================================================
 
             "bta_answer": state.get(
                 "bta_answer"
@@ -294,10 +208,6 @@ class SATQueryAI:
                 "bta_result"
             ),
 
-            # =================================================
-            # CROSS-MODAL
-            # =================================================
-
             "cross_modal_answer": state.get(
                 "cross_modal_answer"
             ),
@@ -305,10 +215,6 @@ class SATQueryAI:
             "cross_modal_result": state.get(
                 "cross_modal_result"
             ),
-
-            # =================================================
-            # GEOSPATIAL
-            # =================================================
 
             "geospatial_result": state.get(
                 "geospatial_result"
@@ -318,9 +224,6 @@ class SATQueryAI:
                 "geospatial_answer"
             ),
 
-            # =================================================
-            # EVIDENCE
-            # =================================================
 
             "evidence": state.get(
                 "evidence"
@@ -331,9 +234,6 @@ class SATQueryAI:
                 []
             ),
 
-            # =================================================
-            # CONFIDENCE
-            # =================================================
 
             "confidence": state.get(
                 "confidence"
@@ -347,9 +247,6 @@ class SATQueryAI:
                 "confidence_level"
             ),
 
-            # =================================================
-            # FINAL ANSWER
-            # =================================================
 
             "answer": state.get(
                 "final_answer"
@@ -358,11 +255,6 @@ class SATQueryAI:
             "final_response": state.get(
                 "final_response"
             ),
-
-            # =================================================
-            # EXECUTION
-            # =================================================
-
             "execution_status": state.get(
                 "execution_status"
             ),
@@ -373,24 +265,15 @@ class SATQueryAI:
 
             "errors": errors,
 
-            # =================================================
-            # COMPLETE STATE
-            # =================================================
 
             "state": state,
         }
 
 
-# ============================================================
-# GLOBAL APPLICATION INSTANCE
-# ============================================================
 
 app = SATQueryAI()
 
 
-# ============================================================
-# FRONTEND INTERFACE
-# ============================================================
 
 def process_query(
     query: str,
@@ -420,10 +303,6 @@ def process_query(
     )
 
 
-# ============================================================
-# HEALTH CHECK
-# ============================================================
-
 def health_check() -> Dict[str, Any]:
     """
     Basic application health check.
@@ -449,9 +328,6 @@ def health_check() -> Dict[str, Any]:
     }
 
 
-# ============================================================
-# TERMINAL DISPLAY
-# ============================================================
 
 def print_result(
     result: Dict[str, Any]
@@ -508,9 +384,6 @@ def print_result(
 
         return
 
-    # --------------------------------------------------------
-    # Query
-    # --------------------------------------------------------
 
     print(
         "\nQuery:"
@@ -522,9 +395,6 @@ def print_result(
         )
     )
 
-    # --------------------------------------------------------
-    # Intent
-    # --------------------------------------------------------
 
     print(
         "\nIntent:"
@@ -542,10 +412,6 @@ def print_result(
             "intent_confidence"
         )
     )
-
-    # --------------------------------------------------------
-    # Routing
-    # --------------------------------------------------------
 
     print(
         "\nRoute:"
@@ -571,9 +437,6 @@ def print_result(
         )
     )
 
-    # --------------------------------------------------------
-    # Models
-    # --------------------------------------------------------
 
     print(
         "\nExecuted models:"
@@ -585,10 +448,6 @@ def print_result(
         )
     )
 
-    # --------------------------------------------------------
-    # Final answer
-    # --------------------------------------------------------
-
     print(
         "\nFinal Answer:"
     )
@@ -599,9 +458,6 @@ def print_result(
         )
     )
 
-    # --------------------------------------------------------
-    # Confidence
-    # --------------------------------------------------------
 
     print(
         "\nConfidence score:"
@@ -619,10 +475,6 @@ def print_result(
             "confidence_level"
         )
     )
-
-    # --------------------------------------------------------
-    # Execution
-    # --------------------------------------------------------
 
     print(
         "\nExecution status:"
@@ -646,10 +498,6 @@ def print_result(
         "\n========================================"
     )
 
-
-# ============================================================
-# APPLICATION TEST
-# ============================================================
 
 if __name__ == "__main__":
 

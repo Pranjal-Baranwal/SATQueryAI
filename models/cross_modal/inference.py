@@ -1,23 +1,4 @@
-"""
-Cross-Modal VLM Inference
-=========================
 
-Optical + SAR satellite image analysis using RSCoVLM.
-
-Inputs:
-    Optical -> data/input/T1.png
-    SAR     -> data/input/Sample.tif
-
-Model:
-    Qingyun/RSCoVLM-7B-2512
-
-The module:
-    1. Loads the Optical and SAR images
-    2. Performs cross-modal fusion
-    3. Creates a fused visualization
-    4. Sends Optical + SAR + fused imagery to the VLM
-    5. Generates an evidence-based cross-modal analysis
-"""
 
 import os
 import time
@@ -35,23 +16,14 @@ from transformers import (
     BitsAndBytesConfig,
 )
 
-# IMPORTANT:
-# cross_modal is inside models/
 from models.cross_modal.fusion import (
     CrossModalFusion,
 )
 
 
-# ============================================================
-# ENVIRONMENT
-# ============================================================
-
 load_dotenv()
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
 MODEL_ID = os.getenv(
     "SIA_MODEL_ID",
@@ -69,9 +41,6 @@ MAX_NEW_TOKENS = 96
 MAX_IMAGE_SIZE = 1024
 
 
-# ============================================================
-# QUANTIZATION
-# ============================================================
 
 QUANTIZATION_CONFIG = None
 
@@ -84,10 +53,6 @@ if DEVICE == "cuda":
         bnb_4bit_use_double_quant=True,
     )
 
-
-# ============================================================
-# CROSS-MODAL INFERENCE ENGINE
-# ============================================================
 
 class CrossModalInference:
 
@@ -109,9 +74,6 @@ class CrossModalInference:
 
         self.loaded = False
 
-    # ========================================================
-    # MODEL LOADING
-    # ========================================================
 
     def load_model(self):
 
@@ -127,9 +89,6 @@ class CrossModalInference:
             f"Device: {self.device}"
         )
 
-        # ----------------------------------------------------
-        # Processor
-        # ----------------------------------------------------
 
         self.processor = (
             AutoProcessor.from_pretrained(
@@ -138,9 +97,6 @@ class CrossModalInference:
             )
         )
 
-        # ----------------------------------------------------
-        # GPU
-        # ----------------------------------------------------
 
         if self.device == "cuda":
 
@@ -171,10 +127,6 @@ class CrossModalInference:
                 )
             )
 
-        # ----------------------------------------------------
-        # CPU fallback
-        # ----------------------------------------------------
-
         else:
 
             print(
@@ -203,9 +155,6 @@ class CrossModalInference:
             "\nCross-Modal model loaded successfully."
         )
 
-    # ========================================================
-    # ARRAY → IMAGE
-    # ========================================================
 
     @staticmethod
     def array_to_image(
@@ -221,9 +170,6 @@ class CrossModalInference:
             np.float32
         )
 
-        # ----------------------------------------------------
-        # Single band
-        # ----------------------------------------------------
 
         if data.shape[0] == 1:
 
@@ -238,9 +184,6 @@ class CrossModalInference:
                 axis=-1
             )
 
-        # ----------------------------------------------------
-        # Two bands
-        # ----------------------------------------------------
 
         elif data.shape[0] == 2:
 
@@ -253,9 +196,6 @@ class CrossModalInference:
                 axis=-1
             )
 
-        # ----------------------------------------------------
-        # Three or more bands
-        # ----------------------------------------------------
 
         else:
 
@@ -287,9 +227,6 @@ class CrossModalInference:
 
         return image
 
-    # ========================================================
-    # FUSED VISUALIZATION
-    # ========================================================
 
     @staticmethod
     def create_fused_visualization(
@@ -312,9 +249,6 @@ class CrossModalInference:
             np.float32
         )
 
-        # ----------------------------------------------------
-        # Optical RGB
-        # ----------------------------------------------------
 
         if optical.shape[0] >= 3:
 
@@ -336,9 +270,6 @@ class CrossModalInference:
                 (1, 2, 0)
             )
 
-        # ----------------------------------------------------
-        # SAR
-        # ----------------------------------------------------
 
         sar_band = sar[0]
 
@@ -351,9 +282,6 @@ class CrossModalInference:
             axis=-1
         )
 
-        # ----------------------------------------------------
-        # Ensure same dimensions
-        # ----------------------------------------------------
 
         height = min(
             optical_rgb.shape[0],
@@ -379,9 +307,6 @@ class CrossModalInference:
             ]
         )
 
-        # ----------------------------------------------------
-        # Weighted fusion
-        # ----------------------------------------------------
 
         fused = (
             0.5 * optical_rgb
@@ -412,9 +337,6 @@ class CrossModalInference:
 
         return image
 
-    # ========================================================
-    # PROMPT
-    # ========================================================
 
     @staticmethod
     def create_prompt(
@@ -473,10 +395,6 @@ USER QUESTION:
 {query}
 """
 
-    # ========================================================
-    # PREPARE CROSS-MODAL INPUT
-    # ========================================================
-
     def prepare_inputs(
         self,
         optical_path,
@@ -502,19 +420,12 @@ USER QUESTION:
             fusion_result["sar"]
         )
 
-        # ----------------------------------------------------
-        # Optical image
-        # ----------------------------------------------------
-
         optical_image = (
             self.array_to_image(
                 optical
             )
         )
 
-        # ----------------------------------------------------
-        # SAR image
-        # ----------------------------------------------------
 
         sar_image = (
             self.array_to_image(
@@ -522,9 +433,6 @@ USER QUESTION:
             )
         )
 
-        # ----------------------------------------------------
-        # Fused image
-        # ----------------------------------------------------
 
         fused_image = (
             self.create_fused_visualization(
@@ -533,9 +441,6 @@ USER QUESTION:
             )
         )
 
-        # ----------------------------------------------------
-        # Save fused visualization
-        # ----------------------------------------------------
 
         fused_path = (
             Path("data/output")
@@ -559,9 +464,6 @@ USER QUESTION:
             fusion_result
         )
 
-    # ========================================================
-    # ANALYZE
-    # ========================================================
 
     def analyze(
         self,
@@ -579,10 +481,6 @@ USER QUESTION:
 
         total_start = time.time()
 
-        # ----------------------------------------------------
-        # Model
-        # ----------------------------------------------------
-
         model_start = time.time()
 
         self.load_model()
@@ -593,9 +491,6 @@ USER QUESTION:
             model_start
         )
 
-        # ----------------------------------------------------
-        # Prepare images
-        # ----------------------------------------------------
 
         fusion_start = time.time()
 
@@ -615,17 +510,11 @@ USER QUESTION:
             fusion_start
         )
 
-        # ----------------------------------------------------
-        # Prompt
-        # ----------------------------------------------------
 
         prompt = self.create_prompt(
             query
         )
 
-        # ----------------------------------------------------
-        # Messages
-        # ----------------------------------------------------
 
         messages = [
             {
@@ -674,9 +563,6 @@ USER QUESTION:
             }
         ]
 
-        # ----------------------------------------------------
-        # Processor
-        # ----------------------------------------------------
 
         processing_start = time.time()
 
@@ -701,10 +587,6 @@ USER QUESTION:
             )
         )
 
-        # ----------------------------------------------------
-        # Move tensors
-        # ----------------------------------------------------
-
         if self.device == "cuda":
 
             inputs = {
@@ -720,9 +602,6 @@ USER QUESTION:
             processing_start
         )
 
-        # ----------------------------------------------------
-        # Generation
-        # ----------------------------------------------------
 
         print(
             "\nGenerating Cross-Modal response..."
@@ -754,9 +633,6 @@ USER QUESTION:
             generation_start
         )
 
-        # ----------------------------------------------------
-        # Remove prompt tokens
-        # ----------------------------------------------------
 
         input_token_length = (
             inputs["input_ids"].shape[1]
@@ -769,9 +645,6 @@ USER QUESTION:
             ]
         )
 
-        # ----------------------------------------------------
-        # Decode
-        # ----------------------------------------------------
 
         answer = (
             self.processor.batch_decode(
@@ -782,10 +655,6 @@ USER QUESTION:
         )
 
         answer = answer.strip()
-
-        # ----------------------------------------------------
-        # GPU memory
-        # ----------------------------------------------------
 
         gpu_memory = None
 
@@ -798,9 +667,6 @@ USER QUESTION:
                 2
             )
 
-        # ----------------------------------------------------
-        # Total
-        # ----------------------------------------------------
 
         total_time = (
             time.time()
@@ -808,9 +674,6 @@ USER QUESTION:
             total_start
         )
 
-        # ----------------------------------------------------
-        # Timing
-        # ----------------------------------------------------
 
         print(
             "\n========== CROSS-MODAL TIMING =========="
@@ -864,10 +727,6 @@ USER QUESTION:
             )
         }
 
-    # ========================================================
-    # SIMPLE COMPARE
-    # ========================================================
-
     def compare(
         self,
         optical_path,
@@ -886,9 +745,6 @@ USER QUESTION:
 
         return result["answer"]
 
-    # ========================================================
-    # STATUS
-    # ========================================================
 
     def status(self):
 
@@ -901,9 +757,6 @@ USER QUESTION:
             "loaded": self.loaded
         }
 
-    # ========================================================
-    # UNLOAD
-    # ========================================================
 
     def unload_model(self):
 
@@ -929,18 +782,12 @@ USER QUESTION:
         )
 
 
-# ============================================================
-# GLOBAL ENGINE
-# ============================================================
 
 cross_modal_engine = (
     CrossModalInference()
 )
 
 
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def analyze_cross_modal(
     optical_path,
@@ -954,10 +801,6 @@ def analyze_cross_modal(
         query=query
     )
 
-
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 

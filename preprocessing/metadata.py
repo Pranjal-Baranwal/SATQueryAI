@@ -33,18 +33,15 @@ class GeoTIFFMetadata:
                 "file_name": self.file_path.name,
                 "file_path": str(self.file_path),
 
-                # Raster information
                 "width": src.width,
                 "height": src.height,
                 "band_count": src.count,
                 "data_types": list(src.dtypes),
 
-                # Geospatial information
                 "crs": str(src.crs) if src.crs else None,
                 "crs_epsg": src.crs.to_epsg() if src.crs else None,
                 "transform": src.transform,
 
-                # Spatial extent
                 "bounds": {
                     "left": src.bounds.left,
                     "bottom": src.bounds.bottom,
@@ -52,17 +49,14 @@ class GeoTIFFMetadata:
                     "top": src.bounds.top
                 },
 
-                # Pixel resolution
                 "resolution": {
                     "x": src.res[0],
                     "y": src.res[1]
                 },
 
-                # Raster properties
                 "nodata": src.nodata,
                 "driver": src.driver,
 
-                # Additional information
                 "units": src.units,
                 "descriptions": src.descriptions
             }
@@ -136,7 +130,6 @@ def get_geotiff_metadata(file_path):
 
 if __name__ == "__main__":
 
-    # Change this to your actual GeoTIFF file
     file_path = "data/input/Sample.tif"
 
     try:

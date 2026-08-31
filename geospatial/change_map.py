@@ -1,89 +1,15 @@
-"""
-TriNetra - Geospatial Change Analysis
---------------------------------------
-
-This module performs geospatial change analysis between two
-already-preprocessed / spatially aligned rasters or index arrays.
-
-IMPORTANT:
-    Geospatial alignment/reprojection is handled by:
-        preprocessing.geospatial_alignment.GeoSpatialAligner
-
-This module does NOT perform reprojection.
-
-Its responsibility is to convert two comparable observations:
-
-        T1
-        +
-        T2
-        ↓
-    Difference
-        ↓
-    Change Mask
-        ↓
-    Spatial Statistics
-        ↓
-    Area / Coverage
-        ↓
-    Geographic Bounds
-        ↓
-    Structured Evidence
-
-Primary use:
-    BTP = Bi-Temporal Processing
-    CDVQA = Change Detection / Change-aware Visual Question Answering
-
-Secondary use:
-    - SIA when a change map is explicitly requested
-    - Agentic Router evidence
-    - Optical + SAR workflows when comparable derived features are supplied
-
-Typical examples:
-
-    NDVI(T1) vs NDVI(T2)
-    NDBI(T1) vs NDBI(T2)
-    NDWI(T1) vs NDWI(T2)
-
-The module is deliberately model-independent:
-    it produces spatial evidence;
-    the VLM / specialist model interprets that evidence.
-"""
-
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import rasterio
 
-
-# =====================================================================
-# Constants
-# =====================================================================
-
 SUPPORTED_MODES = {
     "absolute",
     "signed",
 }
 
-
-# =====================================================================
-# Main Change Analyzer
-# =====================================================================
-
 class ChangeMapAnalyzer:
-    """
-    Performs change analysis for two temporally separated observations.
-
-    Parameters
-    ----------
-    reference_path : str
-        GeoTIFF corresponding to T1.
-
-    comparison_path : str
-        GeoTIFF corresponding to T2.
-
-    Both rasters should already be aligned to the same spatial grid.
-    """
 
     def __init__(
         self,
@@ -112,10 +38,6 @@ class ChangeMapAnalyzer:
 
         self._load_metadata()
 
-    # =================================================================
-    # Validation
-    # =================================================================
-
     @staticmethod
     def _validate_file(
         file_path: Path
@@ -139,10 +61,6 @@ class ChangeMapAnalyzer:
                 f"File must be a GeoTIFF (.tif/.tiff): "
                 f"{file_path}"
             )
-
-    # =================================================================
-    # Metadata
-    # =================================================================
 
     @staticmethod
     def _get_raster_info(
@@ -180,10 +98,6 @@ class ChangeMapAnalyzer:
                 self.comparison_path
             )
         )
-
-    # =================================================================
-    # Alignment validation
-    # =================================================================
 
     def check_alignment(
         self
@@ -247,10 +161,6 @@ class ChangeMapAnalyzer:
             "aligned": aligned
         }
 
-    # =================================================================
-    # Read raster
-    # =================================================================
-
     @staticmethod
     def _read_band(
         file_path: Path,
@@ -287,9 +197,6 @@ class ChangeMapAnalyzer:
 
             return data
 
-    # =================================================================
-    # Prepare arrays
-    # =================================================================
 
     @staticmethod
     def _prepare_array(
@@ -315,11 +222,6 @@ class ChangeMapAnalyzer:
         ] = np.nan
 
         return array
-
-    # =================================================================
-    # Validate two arrays
-    # =================================================================
-
     @staticmethod
     def _validate_array_pair(
         reference: np.ndarray,
@@ -349,9 +251,6 @@ class ChangeMapAnalyzer:
 
         return reference, comparison
 
-    # =================================================================
-    # Difference
-    # =================================================================
 
     @staticmethod
     def difference(
@@ -415,10 +314,6 @@ class ChangeMapAnalyzer:
 
         return result
 
-    # =================================================================
-    # Change mask
-    # =================================================================
-
     @staticmethod
     def change_mask(
         difference: np.ndarray,
@@ -473,10 +368,6 @@ class ChangeMapAnalyzer:
 
         return mask & valid
 
-    # =================================================================
-    # Increase mask
-    # =================================================================
-
     @staticmethod
     def increase_mask(
         difference: np.ndarray,
@@ -511,11 +402,6 @@ class ChangeMapAnalyzer:
             &
             valid
         )
-
-    # =================================================================
-    # Decrease mask
-    # =================================================================
-
     @staticmethod
     def decrease_mask(
         difference: np.ndarray,
@@ -550,11 +436,6 @@ class ChangeMapAnalyzer:
             &
             valid
         )
-
-    # =================================================================
-    # Valid pixel count
-    # =================================================================
-
     @staticmethod
     def valid_pixel_count(
         array: np.ndarray
@@ -570,10 +451,6 @@ class ChangeMapAnalyzer:
             )
         )
 
-    # =================================================================
-    # Changed pixel count
-    # =================================================================
-
     @staticmethod
     def changed_pixel_count(
         mask: np.ndarray
@@ -586,11 +463,7 @@ class ChangeMapAnalyzer:
 
         return int(
             np.count_nonzero(mask)
-        )
-
-    # =================================================================
-    # Change percentage
-    # =================================================================
+        ) 
 
     @staticmethod
     def change_percentage(
@@ -642,11 +515,6 @@ class ChangeMapAnalyzer:
             changed /
             total_valid
         ) * 100.0
-
-    # =================================================================
-    # Pixel area
-    # =================================================================
-
     def pixel_area(
         self
     ) -> Optional[float]:
@@ -685,10 +553,6 @@ class ChangeMapAnalyzer:
             y_resolution
         )
 
-    # =================================================================
-    # Changed area
-    # =================================================================
-
     def changed_area_m2(
         self,
         mask: np.ndarray
@@ -707,10 +571,6 @@ class ChangeMapAnalyzer:
             *
             area
         )
-
-    # =================================================================
-    # Changed area km²
-    # =================================================================
 
     def changed_area_km2(
         self,
@@ -731,10 +591,6 @@ class ChangeMapAnalyzer:
             area_m2 /
             1_000_000.0
         )
-
-    # =================================================================
-    # Spatial bounds
-    # =================================================================
 
     def mask_bounds(
         self,
@@ -806,10 +662,6 @@ class ChangeMapAnalyzer:
             )
         }
 
-    # =================================================================
-    # Change statistics
-    # =================================================================
-
     @staticmethod
     def difference_statistics(
         difference: np.ndarray
@@ -856,10 +708,6 @@ class ChangeMapAnalyzer:
             )
         }
 
-    # =================================================================
-    # Complete change analysis
-    # =================================================================
-
     def analyze(
         self,
         reference: np.ndarray,
@@ -891,8 +739,6 @@ class ChangeMapAnalyzer:
                 comparison
             )
         )
-
-        # Check raster dimensions.
         expected_shape = (
             self.reference_info["height"],
             self.reference_info["width"]
@@ -1013,10 +859,6 @@ class ChangeMapAnalyzer:
 
         return result
 
-    # =================================================================
-    # Directional change analysis
-    # =================================================================
-
     def analyze_directional_change(
         self,
         reference: np.ndarray,
@@ -1118,10 +960,6 @@ class ChangeMapAnalyzer:
                 )
             )
         }
-
-    # =================================================================
-    # TriNetra evidence
-    # =================================================================
 
     def generate_evidence(
         self,
@@ -1251,11 +1089,6 @@ class ChangeMapAnalyzer:
 
         return evidence
 
-
-# =====================================================================
-# Convenience functions
-# =====================================================================
-
 def calculate_difference(
     reference: np.ndarray,
     comparison: np.ndarray,
@@ -1286,11 +1119,6 @@ def create_change_mask(
         threshold=threshold,
         absolute=absolute
     )
-
-
-# =====================================================================
-# Example
-# =====================================================================
 
 if __name__ == "__main__":
 

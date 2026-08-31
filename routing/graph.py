@@ -1,28 +1,3 @@
-"""
-SATQueryAI Routing Graph
-========================
-
-Orchestrates the complete SATQueryAI pipeline:
-
-    User Query
-        ↓
-    Intent Classifier
-        ↓
-    Router
-        ↓
-    SIA / BTA / Cross-Modal
-        ↓
-    Evidence Generator
-        ↓
-    Confidence Estimator
-        ↓
-    Final Answer
-
-The graph is intentionally lightweight.
-
-It does NOT load all models at startup.
-Only the models selected by the router are executed.
-"""
 
 import time
 from typing import Any, Dict, List, Optional
@@ -50,9 +25,6 @@ from routing.router import (
 )
 
 
-# ============================================================
-# GRAPH
-# ============================================================
 
 class SATQueryGraph:
     """
@@ -67,9 +39,6 @@ class SATQueryGraph:
 
         self.router = Router()
 
-    # ========================================================
-    # INTENT NODE
-    # ========================================================
 
     def classify_intent(
         self,
@@ -126,10 +95,6 @@ class SATQueryGraph:
                 f"Intent classification failed: {exc}"
             )
 
-    # ========================================================
-    # ROUTER NODE
-    # ========================================================
-
     def route(
         self,
         state: RoutingState
@@ -151,9 +116,6 @@ class SATQueryGraph:
                 f"Routing failed: {exc}"
             )
 
-    # ========================================================
-    # SIA NODE
-    # ========================================================
 
     def run_sia(
         self,
@@ -210,9 +172,6 @@ class SATQueryGraph:
                 ),
             )
 
-            # ------------------------------------------------
-            # Normalize result
-            # ------------------------------------------------
 
             answer = self.extract_answer(
                 result
@@ -240,10 +199,6 @@ class SATQueryGraph:
                 state,
                 f"SIA execution failed: {exc}"
             )
-
-    # ========================================================
-    # BTA NODE
-    # ========================================================
 
     def run_bta(
         self,
@@ -302,9 +257,6 @@ class SATQueryGraph:
                 ),
             )
 
-            # ------------------------------------------------
-            # Normalize result
-            # ------------------------------------------------
 
             answer = self.extract_answer(
                 result
@@ -332,10 +284,6 @@ class SATQueryGraph:
                 state,
                 f"BTA execution failed: {exc}"
             )
-
-    # ========================================================
-    # CROSS-MODAL NODE
-    # ========================================================
 
     def run_cross_modal(
         self,
@@ -394,9 +342,6 @@ class SATQueryGraph:
                 ),
             )
 
-            # ------------------------------------------------
-            # Normalize result
-            # ------------------------------------------------
 
             answer = self.extract_answer(
                 result
@@ -424,10 +369,6 @@ class SATQueryGraph:
                 state,
                 f"Cross-Modal execution failed: {exc}"
             )
-
-    # ========================================================
-    # MODEL EXECUTION
-    # ========================================================
 
     def execute_models(
         self,
@@ -457,15 +398,9 @@ class SATQueryGraph:
                     route
                 ]
 
-        # ----------------------------------------------------
-        # Execute routes
-        # ----------------------------------------------------
 
         for route in routes:
 
-            # -----------------------------------------------
-            # SIA
-            # -----------------------------------------------
 
             if route == SIA:
 
@@ -473,9 +408,6 @@ class SATQueryGraph:
                     state
                 )
 
-            # -----------------------------------------------
-            # BTA
-            # -----------------------------------------------
 
             elif route == BTA:
 
@@ -483,9 +415,6 @@ class SATQueryGraph:
                     state
                 )
 
-            # -----------------------------------------------
-            # Cross-Modal
-            # -----------------------------------------------
 
             elif route == CROSS_MODAL:
 
@@ -494,10 +423,6 @@ class SATQueryGraph:
                 )
 
         return state
-
-    # ========================================================
-    # EVIDENCE NODE
-    # ========================================================
 
     def generate_evidence(
         self,
@@ -559,10 +484,6 @@ class SATQueryGraph:
                 state,
                 f"Evidence generation failed: {exc}"
             )
-
-    # ========================================================
-    # CONFIDENCE NODE
-    # ========================================================
 
     def calculate_confidence(
         self,
@@ -626,9 +547,6 @@ class SATQueryGraph:
                 f"Confidence calculation failed: {exc}"
             )
 
-    # ========================================================
-    # FINAL ANSWER
-    # ========================================================
 
     def generate_final_answer(
         self,
@@ -650,10 +568,6 @@ class SATQueryGraph:
 
         answers = []
 
-        # ----------------------------------------------------
-        # SIA
-        # ----------------------------------------------------
-
         if state.get(
             "sia_answer"
         ):
@@ -666,10 +580,6 @@ class SATQueryGraph:
                     ]
                 )
             )
-
-        # ----------------------------------------------------
-        # BTA
-        # ----------------------------------------------------
 
         if state.get(
             "bta_answer"
@@ -684,9 +594,6 @@ class SATQueryGraph:
                 )
             )
 
-        # ----------------------------------------------------
-        # Cross-Modal
-        # ----------------------------------------------------
 
         if state.get(
             "cross_modal_answer"
@@ -701,10 +608,6 @@ class SATQueryGraph:
                 )
             )
 
-        # ----------------------------------------------------
-        # No answer
-        # ----------------------------------------------------
-
         if not answers:
 
             final_answer = (
@@ -712,19 +615,12 @@ class SATQueryGraph:
                 "an answer."
             )
 
-        # ----------------------------------------------------
-        # One model
-        # ----------------------------------------------------
 
         elif len(
             answers
         ) == 1:
 
             final_answer = answers[0][1]
-
-        # ----------------------------------------------------
-        # Multiple models
-        # ----------------------------------------------------
 
         else:
 
@@ -743,10 +639,6 @@ class SATQueryGraph:
                     sections
                 )
             )
-
-        # ----------------------------------------------------
-        # Final response object
-        # ----------------------------------------------------
 
         final_response = {
 
@@ -787,9 +679,6 @@ class SATQueryGraph:
             final_response=final_response,
         )
 
-    # ========================================================
-    # COMPLETE GRAPH
-    # ========================================================
 
     def run(
         self,
@@ -801,9 +690,6 @@ class SATQueryGraph:
 
         start_time = time.perf_counter()
 
-        # ----------------------------------------------------
-        # Validate
-        # ----------------------------------------------------
 
         validation_errors = validate_state(
             state
@@ -820,17 +706,10 @@ class SATQueryGraph:
 
             return state
 
-        # ----------------------------------------------------
-        # Mark running
-        # ----------------------------------------------------
 
         state = mark_running(
             state
         )
-
-        # ----------------------------------------------------
-        # Intent
-        # ----------------------------------------------------
 
         state = self.classify_intent(
             state
@@ -845,9 +724,6 @@ class SATQueryGraph:
                 start_time
             )
 
-        # ----------------------------------------------------
-        # Routing
-        # ----------------------------------------------------
 
         state = self.route(
             state
@@ -862,50 +738,30 @@ class SATQueryGraph:
                 start_time
             )
 
-        # ----------------------------------------------------
-        # Execute selected models
-        # ----------------------------------------------------
 
         state = self.execute_models(
             state
         )
 
-        # ----------------------------------------------------
-        # Evidence
-        # ----------------------------------------------------
-
         state = self.generate_evidence(
             state
         )
-
-        # ----------------------------------------------------
-        # Confidence
-        # ----------------------------------------------------
 
         state = self.calculate_confidence(
             state
         )
 
-        # ----------------------------------------------------
-        # Final answer
-        # ----------------------------------------------------
 
         state = self.generate_final_answer(
             state
         )
 
-        # ----------------------------------------------------
-        # Complete
-        # ----------------------------------------------------
 
         return self.finish(
             state,
             start_time
         )
 
-    # ========================================================
-    # FINISH
-    # ========================================================
 
     def finish(
         self,
@@ -941,9 +797,6 @@ class SATQueryGraph:
             state
         )
 
-    # ========================================================
-    # ANSWER EXTRACTION
-    # ========================================================
 
     @staticmethod
     def extract_answer(
@@ -958,9 +811,6 @@ class SATQueryGraph:
 
             return ""
 
-        # ----------------------------------------------------
-        # String
-        # ----------------------------------------------------
 
         if isinstance(
             result,
@@ -968,10 +818,6 @@ class SATQueryGraph:
         ):
 
             return result
-
-        # ----------------------------------------------------
-        # Dictionary
-        # ----------------------------------------------------
 
         if isinstance(
             result,
@@ -1001,25 +847,13 @@ class SATQueryGraph:
                 result
             )
 
-        # ----------------------------------------------------
-        # Other
-        # ----------------------------------------------------
-
         return str(
             result
         )
 
 
-# ============================================================
-# GLOBAL GRAPH
-# ============================================================
-
 graph = SATQueryGraph()
 
-
-# ============================================================
-# CONVENIENCE FUNCTION
-# ============================================================
 
 def run_pipeline(
     query: str,
@@ -1061,28 +895,12 @@ def run_pipeline(
     )
 
 
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 
     print(
         "\n========== SATQUERYAI GRAPH TEST =========="
     )
-
-    # --------------------------------------------------------
-    # IMPORTANT
-    # --------------------------------------------------------
-    #
-    # This test uses routing only.
-    #
-    # The actual 7B model execution is intentionally NOT
-    # performed here because running SIA/BTA/Cross-Modal
-    # can take several minutes on the RTX 5050.
-    #
-    # We test the graph structure up to routing.
-    # --------------------------------------------------------
 
     test_query = (
         "What changed between T1 and T2?"
@@ -1109,9 +927,6 @@ if __name__ == "__main__":
         state["query"]
     )
 
-    # --------------------------------------------------------
-    # Validate
-    # --------------------------------------------------------
 
     validation_errors = (
         validate_state(
@@ -1137,10 +952,6 @@ if __name__ == "__main__":
             "\nValidation: PASSED"
         )
 
-    # --------------------------------------------------------
-    # Intent
-    # --------------------------------------------------------
-
     state = graph.classify_intent(
         state
     )
@@ -1162,9 +973,6 @@ if __name__ == "__main__":
         )
     )
 
-    # --------------------------------------------------------
-    # Route
-    # --------------------------------------------------------
 
     state = graph.route(
         state

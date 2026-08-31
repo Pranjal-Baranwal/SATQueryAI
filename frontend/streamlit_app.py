@@ -4,29 +4,12 @@ import sys
 
 import streamlit as st
 
-
-# ============================================================
-# SATQueryAI — Streamlit Frontend + Existing Workflow
-# ============================================================
-# UI is kept from the redesigned frontend.
-# Existing backend workflow is connected through process_query().
-# ============================================================
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-
-# ============================================================
-# BACKEND IMPORT
-# ============================================================
-
 from app import process_query
-
-# ============================================================
-# PAGE CONFIG
-# ============================================================
 
 st.set_page_config(
     page_title="SATQueryAI | Earth Observation Intelligence",
@@ -37,9 +20,6 @@ st.set_page_config(
 
 from random import *
 conf = randint(77,94)
-# ============================================================
-# ASSET
-# ============================================================
 
 APP_DIR = Path(__file__).resolve().parent
 BG_PATH = APP_DIR / "assets" / "earth_space_background.png"
@@ -57,10 +37,6 @@ def get_data_uri(path: Path) -> str:
 bg_uri = get_data_uri(BG_PATH)
 bg_css = f'url("{bg_uri}")' if bg_uri else "none"
 
-
-# ============================================================
-# HELPERS
-# ============================================================
 
 def escape_html(value: str) -> str:
     """Escape model/backend text before putting it into HTML."""
@@ -86,11 +62,6 @@ def save_uploaded_file(uploaded_file, directory, filename):
 
     return str(file_path)
 
-
-# ============================================================
-# SESSION STATE
-# ============================================================
-
 if "section" not in st.session_state:
     st.session_state.section = "analysis"
 
@@ -99,11 +70,6 @@ if "result" not in st.session_state:
 
 if "analysis_started" not in st.session_state:
     st.session_state.analysis_started = False
-
-
-# ============================================================
-# CUSTOM CSS — REDESIGNED FRONTEND
-# ============================================================
 
 st.markdown(
     f"""
@@ -818,11 +784,6 @@ div[data-testid="stMetricValue"] {{
     unsafe_allow_html=True,
 )
 
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
 with st.sidebar:
     st.markdown(
         """
@@ -871,11 +832,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-
-# ============================================================
-# HEADER
-# ============================================================
-
 st.markdown(
     """
 <div class="brand">
@@ -887,11 +843,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
-# ============================================================
-# HERO
-# ============================================================
 
 st.markdown(
     """
@@ -907,17 +858,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# ============================================================
-# MAIN COLUMNS
-# ============================================================
-
 left, right = st.columns([2.02, 0.98], gap="large")
-
-
-# ============================================================
-# LEFT — ANALYSIS WORKSPACE
-# ============================================================
 
 with left:
     analysis_class = "section focused" if st.session_state.section == "analysis" else "section"
@@ -941,11 +882,6 @@ with left:
         label_visibility="collapsed",
         key="query_input",
     )
-
-    # --------------------------------------------------------
-    # Uploads
-    # --------------------------------------------------------
-
     st.markdown(
         """
 <div class="section">
@@ -986,10 +922,6 @@ with left:
         )
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-    # --------------------------------------------------------
-    # Analyze button — original backend workflow preserved
-    # --------------------------------------------------------
 
     if st.button(
         "Analyze Satellite Data  →",
@@ -1059,12 +991,6 @@ with left:
         except Exception as exc:
             st.error(str(exc))
             st.stop()
-
-
-    # --------------------------------------------------------
-    # Image Preview
-    # --------------------------------------------------------
-    
     
 
     st.markdown(
@@ -1102,11 +1028,6 @@ with left:
                     '<div class="preview-empty">No image uploaded</div>',
                     unsafe_allow_html=True,
                 )
-
-
-    # --------------------------------------------------------
-    # Actual result rendered through the new UI
-    # --------------------------------------------------------
 
     result = st.session_state.result
 
@@ -1172,11 +1093,6 @@ with left:
                 """
             )
 
-
-# ============================================================
-# RIGHT — SUMMARY / MODEL INFO
-# ============================================================
-
 with right:
     result = st.session_state.result
 
@@ -1191,8 +1107,7 @@ with right:
             if confidence is not None
             else "N/A"
         )
-
-        # UI-only status. Do not expose backend execution_status.
+        
         status_text = "Complete"
 
         answer = result.get("answer")
@@ -1203,7 +1118,7 @@ with right:
         route_text = "—"
         confidence_display = "—"
 
-        # Before analysis, show a simple UI state.
+        
         status_text = "Ready"
 
         answer = None
@@ -1222,7 +1137,7 @@ with right:
         unsafe_allow_html=True,
     )
 
-    # Raw HTML is static; model values are escaped before insertion.
+    
     st.html(
     f"""
     <div class="info-card">
@@ -1290,7 +1205,6 @@ with right:
         unsafe_allow_html=True,
     )
 
-    # Build model information BEFORE rendering the card.
     model_descriptions = {
         "SIA": (
             "Single Image Analysis for objects, land cover "
@@ -1342,20 +1256,3 @@ with right:
 </div>
 """
     )
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-
-# st.markdown(
-#    """
-# <div class="app-footer">
-#    <strong>SATQueryAI</strong>
-#    &nbsp;•&nbsp;
-#    Built for Bharat, for the Earth. 🇮🇳
-# </div>
-# """,
-#    unsafe_allow_html=True,
-# )

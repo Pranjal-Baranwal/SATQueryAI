@@ -1,49 +1,9 @@
-"""
-TriNetra - Geospatial Index Analysis
--------------------------------------
-
-This module does NOT calculate NDVI, NDWI or NDBI.
-
-Those indices are already calculated by the preprocessing layer.
-This module converts the calculated index arrays into useful
-geospatial information for TriNetra:
-
-    Index Array
-        ↓
-    Statistics
-        ↓
-    Threshold / Region Mask
-        ↓
-    Coverage / Pixel Count
-        ↓
-    Area Estimation
-        ↓
-    Spatial Bounds
-        ↓
-    Structured Evidence
-        ↓
-    SIA / BTP / Opt+SAR / Agentic Router
-
-Current prototype assumes that band selection and index calculation
-are handled by the preprocessing layer using the uploaded GeoTIFF's
-actual band ordering.
-
-Supported indices:
-    - NDVI : Normalized Difference Vegetation Index
-    - NDWI : Normalized Difference Water Index
-    - NDBI : Normalized Difference Built-up Index
-"""
-
 from pathlib import Path
 from typing import Dict, Optional, Union
 
 import numpy as np
 import rasterio
 
-
-# ---------------------------------------------------------------------
-# Supported indices
-# ---------------------------------------------------------------------
 
 SUPPORTED_INDICES = {
     "NDVI",
@@ -52,30 +12,7 @@ SUPPORTED_INDICES = {
 }
 
 
-# ---------------------------------------------------------------------
-# Main analyzer
-# ---------------------------------------------------------------------
-
 class GeospatialIndexAnalyzer:
-    """
-    Analyze already-computed geospatial indices.
-
-    Parameters
-    ----------
-    raster_path : str
-        Path to the GeoTIFF from which the index was generated.
-
-    Why do we need the raster path?
-    --------------------------------
-    The index array itself tells us the index values, but the GeoTIFF
-    provides the geographic information needed to calculate:
-
-        - CRS
-        - pixel resolution
-        - spatial bounds
-        - approximate area
-        - geographic position of detected regions
-    """
 
     def __init__(self, raster_path: str):
 
@@ -100,10 +37,6 @@ class GeospatialIndexAnalyzer:
 
         self._load_spatial_metadata()
 
-    # -----------------------------------------------------------------
-    # Read GeoTIFF spatial metadata
-    # -----------------------------------------------------------------
-
     def _load_spatial_metadata(self) -> None:
         """
         Read only the geospatial information.
@@ -123,9 +56,6 @@ class GeospatialIndexAnalyzer:
 
             self.bounds = src.bounds
 
-    # -----------------------------------------------------------------
-    # Validate index
-    # -----------------------------------------------------------------
 
     @staticmethod
     def _prepare_index(index: np.ndarray) -> np.ndarray:
@@ -148,20 +78,14 @@ class GeospatialIndexAnalyzer:
 
         cleaned = index.copy()
 
-        # Remove NaN and infinity values.
         cleaned[~np.isfinite(cleaned)] = np.nan
 
-        # These are the three supported normalized-difference indices.
         cleaned[
             (cleaned < -1.0) |
             (cleaned > 1.0)
         ] = np.nan
 
         return cleaned
-
-    # -----------------------------------------------------------------
-    # Validate index name
-    # -----------------------------------------------------------------
 
     @staticmethod
     def _validate_index_name(index_name: str) -> str:
@@ -179,9 +103,6 @@ class GeospatialIndexAnalyzer:
 
         return name
 
-    # -----------------------------------------------------------------
-    # Basic statistics
-    # -----------------------------------------------------------------
 
     def statistics(
         self,
@@ -223,9 +144,6 @@ class GeospatialIndexAnalyzer:
             "std": float(np.std(valid)),
         }
 
-    # -----------------------------------------------------------------
-    # Valid pixels
-    # -----------------------------------------------------------------
 
     def valid_pixel_count(
         self,
@@ -243,9 +161,6 @@ class GeospatialIndexAnalyzer:
             )
         )
 
-    # -----------------------------------------------------------------
-    # Pixel area
-    # -----------------------------------------------------------------
 
     def pixel_area(self) -> Optional[float]:
         """
@@ -272,9 +187,6 @@ class GeospatialIndexAnalyzer:
 
         return x_res * y_res
 
-    # -----------------------------------------------------------------
-    # Area from mask
-    # -----------------------------------------------------------------
 
     def area_from_mask(
         self,
@@ -306,9 +218,6 @@ class GeospatialIndexAnalyzer:
 
         return selected_pixels * pixel_area
 
-    # -----------------------------------------------------------------
-    # Area in km²
-    # -----------------------------------------------------------------
 
     def area_km2(
         self,
@@ -325,9 +234,6 @@ class GeospatialIndexAnalyzer:
 
         return area_m2 / 1_000_000.0
 
-    # -----------------------------------------------------------------
-    # Coverage percentage
-    # -----------------------------------------------------------------
 
     def coverage_percentage(
         self,
@@ -381,9 +287,6 @@ class GeospatialIndexAnalyzer:
             total_valid
         ) * 100.0
 
-    # -----------------------------------------------------------------
-    # Create threshold mask
-    # -----------------------------------------------------------------
 
     @staticmethod
     def threshold_mask(
@@ -473,12 +376,8 @@ class GeospatialIndexAnalyzer:
                 "'less_equal' or 'between'."
             )
 
-        # Invalid pixels must never become selected regions.
         return mask & valid
 
-    # -----------------------------------------------------------------
-    # Geographic bounds of detected region
-    # -----------------------------------------------------------------
 
     def mask_bounds(
         self,
@@ -537,9 +436,6 @@ class GeospatialIndexAnalyzer:
             "top": float(top_left[1]),
         }
 
-    # -----------------------------------------------------------------
-    # Complete summary
-    # -----------------------------------------------------------------
 
     def summarize(
         self,
@@ -561,7 +457,6 @@ class GeospatialIndexAnalyzer:
 
         index = self._prepare_index(index)
 
-        # Make sure raster and index dimensions match.
         if (
             index.shape[0] != self.height
             or
@@ -593,8 +488,6 @@ class GeospatialIndexAnalyzer:
             ),
         }
 
-        # If no threshold was requested,
-        # return the basic spatial summary.
         if threshold is None:
             return result
 
@@ -636,9 +529,6 @@ class GeospatialIndexAnalyzer:
 
         return result
 
-    # -----------------------------------------------------------------
-    # Evidence for TriNetra
-    # -----------------------------------------------------------------
 
     def generate_evidence(
         self,
@@ -721,8 +611,6 @@ class GeospatialIndexAnalyzer:
             ],
         }
 
-        # Area exists only when directly computable
-        # from a projected CRS.
         if "area_km2" in summary:
 
             evidence["area_km2"] = (
@@ -732,9 +620,6 @@ class GeospatialIndexAnalyzer:
         return evidence
 
 
-# =====================================================================
-# Convenience function
-# =====================================================================
 
 def analyze_index(
     raster_path: str,
@@ -769,9 +654,6 @@ def analyze_index(
     )
 
 
-# =====================================================================
-# TriNetra-oriented convenience helper
-# =====================================================================
 
 def generate_index_evidence(
     raster_path: str,
@@ -799,10 +681,6 @@ def generate_index_evidence(
         condition=condition
     )
 
-
-# =====================================================================
-# Local testing
-# =====================================================================
 
 if __name__ == "__main__":
 

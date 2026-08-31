@@ -26,27 +26,11 @@ Pipeline:
 from typing import Any, Dict, List, Optional, TypedDict
 
 
-# ============================================================
-# ROUTING STATE
-# ============================================================
 
 class RoutingState(TypedDict, total=False):
-    """
-    Shared state for the SATQueryAI routing pipeline.
-
-    All fields are optional so individual nodes can gradually
-    populate the state.
-    """
-
-    # --------------------------------------------------------
-    # USER INPUT
-    # --------------------------------------------------------
 
     query: str
 
-    # --------------------------------------------------------
-    # INPUT DATA
-    # --------------------------------------------------------
 
     optical_path: Optional[str]
 
@@ -58,19 +42,12 @@ class RoutingState(TypedDict, total=False):
 
     t2_path: Optional[str]
 
-    # --------------------------------------------------------
-    # INTENT
-    # --------------------------------------------------------
 
     intent: Optional[str]
 
     intent_confidence: Optional[float]
 
     intent_reason: Optional[str]
-
-    # --------------------------------------------------------
-    # ROUTING
-    # --------------------------------------------------------
 
     route: Optional[str]
 
@@ -80,9 +57,6 @@ class RoutingState(TypedDict, total=False):
 
     routing_reason: Optional[str]
 
-    # --------------------------------------------------------
-    # MODEL OUTPUTS
-    # --------------------------------------------------------
 
     sia_result: Optional[Dict[str, Any]]
 
@@ -96,17 +70,10 @@ class RoutingState(TypedDict, total=False):
 
     cross_modal_answer: Optional[str]
 
-    # --------------------------------------------------------
-    # EVIDENCE
-    # --------------------------------------------------------
-
     evidence: Optional[Dict[str, Any]]
 
     evidence_items: List[Dict[str, Any]]
 
-    # --------------------------------------------------------
-    # CONFIDENCE
-    # --------------------------------------------------------
 
     confidence: Optional[Dict[str, Any]]
 
@@ -114,17 +81,11 @@ class RoutingState(TypedDict, total=False):
 
     confidence_level: Optional[str]
 
-    # --------------------------------------------------------
-    # FINAL RESPONSE
-    # --------------------------------------------------------
 
     final_answer: Optional[str]
 
     final_response: Optional[Dict[str, Any]]
 
-    # --------------------------------------------------------
-    # EXECUTION
-    # --------------------------------------------------------
 
     executed_models: List[str]
 
@@ -132,24 +93,14 @@ class RoutingState(TypedDict, total=False):
 
     execution_time: Optional[float]
 
-    # --------------------------------------------------------
-    # ERROR HANDLING
-    # --------------------------------------------------------
 
     error: Optional[str]
 
     errors: List[str]
 
-    # --------------------------------------------------------
-    # DEBUGGING / METADATA
-    # --------------------------------------------------------
 
     metadata: Dict[str, Any]
 
-
-# ============================================================
-# STATE CREATION
-# ============================================================
 
 def create_initial_state(
     query: str,
@@ -159,41 +110,10 @@ def create_initial_state(
     t1_path: Optional[str] = None,
     t2_path: Optional[str] = None,
 ) -> RoutingState:
-    """
-    Create the initial state for a SATQueryAI request.
-
-    Parameters
-    ----------
-    query:
-        User's natural-language query.
-
-    image_path:
-        Optional single satellite image.
-
-    optical_path:
-        Optional Optical image.
-
-    sar_path:
-        Optional SAR image.
-
-    t1_path:
-        Optional first temporal image.
-
-    t2_path:
-        Optional second temporal image.
-    """
-
     return RoutingState(
 
-        # ----------------------------------------------------
-        # User input
-        # ----------------------------------------------------
 
         query=query,
-
-        # ----------------------------------------------------
-        # Input data
-        # ----------------------------------------------------
 
         image_path=image_path,
 
@@ -205,19 +125,12 @@ def create_initial_state(
 
         t2_path=t2_path,
 
-        # ----------------------------------------------------
-        # Intent
-        # ----------------------------------------------------
 
         intent=None,
 
         intent_confidence=None,
 
         intent_reason=None,
-
-        # ----------------------------------------------------
-        # Routing
-        # ----------------------------------------------------
 
         route=None,
 
@@ -227,9 +140,6 @@ def create_initial_state(
 
         routing_reason=None,
 
-        # ----------------------------------------------------
-        # Model outputs
-        # ----------------------------------------------------
 
         sia_result=None,
 
@@ -243,17 +153,9 @@ def create_initial_state(
 
         cross_modal_answer=None,
 
-        # ----------------------------------------------------
-        # Evidence
-        # ----------------------------------------------------
-
         evidence=None,
 
         evidence_items=[],
-
-        # ----------------------------------------------------
-        # Confidence
-        # ----------------------------------------------------
 
         confidence=None,
 
@@ -261,17 +163,11 @@ def create_initial_state(
 
         confidence_level=None,
 
-        # ----------------------------------------------------
-        # Final response
-        # ----------------------------------------------------
 
         final_answer=None,
 
         final_response=None,
 
-        # ----------------------------------------------------
-        # Execution
-        # ----------------------------------------------------
 
         executed_models=[],
 
@@ -279,25 +175,16 @@ def create_initial_state(
 
         execution_time=None,
 
-        # ----------------------------------------------------
-        # Errors
-        # ----------------------------------------------------
 
         error=None,
 
         errors=[],
 
-        # ----------------------------------------------------
-        # Metadata
-        # ----------------------------------------------------
 
         metadata={},
     )
 
 
-# ============================================================
-# STATE UPDATE HELPERS
-# ============================================================
 
 def update_state(
     state: RoutingState,
@@ -320,10 +207,6 @@ def update_state(
         **new_state
     )
 
-
-# ============================================================
-# ADD EXECUTED MODEL
-# ============================================================
 
 def add_executed_model(
     state: RoutingState,
@@ -356,10 +239,6 @@ def add_executed_model(
         **new_state
     )
 
-
-# ============================================================
-# ADD ERROR
-# ============================================================
 
 def add_error(
     state: RoutingState,
@@ -399,10 +278,6 @@ def add_error(
     )
 
 
-# ============================================================
-# MARK COMPLETE
-# ============================================================
-
 def mark_complete(
     state: RoutingState
 ) -> RoutingState:
@@ -420,10 +295,6 @@ def mark_complete(
         **new_state
     )
 
-
-# ============================================================
-# MARK RUNNING
-# ============================================================
 
 def mark_running(
     state: RoutingState
@@ -443,9 +314,6 @@ def mark_running(
     )
 
 
-# ============================================================
-# STATE VALIDATION
-# ============================================================
 
 def validate_state(
     state: RoutingState
@@ -461,10 +329,6 @@ def validate_state(
     """
 
     errors = []
-
-    # --------------------------------------------------------
-    # Query
-    # --------------------------------------------------------
 
     query = state.get(
         "query"
@@ -491,9 +355,6 @@ def validate_state(
             "User query cannot be empty."
         )
 
-    # --------------------------------------------------------
-    # Image availability
-    # --------------------------------------------------------
 
     image_available = any(
         [
@@ -514,9 +375,6 @@ def validate_state(
     return errors
 
 
-# ============================================================
-# STATE SUMMARY
-# ============================================================
 
 def state_summary(
     state: RoutingState
@@ -575,19 +433,12 @@ def state_summary(
     }
 
 
-# ============================================================
-# TEST
-# ============================================================
-
 if __name__ == "__main__":
 
     print(
         "\n========== ROUTING STATE TEST =========="
     )
 
-    # --------------------------------------------------------
-    # Create state
-    # --------------------------------------------------------
 
     state = create_initial_state(
 
@@ -604,10 +455,6 @@ if __name__ == "__main__":
             "data/input/T2.png"
         ),
     )
-
-    # --------------------------------------------------------
-    # Validate
-    # --------------------------------------------------------
 
     validation_errors = (
         validate_state(
@@ -633,10 +480,6 @@ if __name__ == "__main__":
             "\nState validation: PASSED"
         )
 
-    # --------------------------------------------------------
-    # Simulate routing
-    # --------------------------------------------------------
-
     state = update_state(
         state,
         intent="bi_temporal_change",
@@ -654,10 +497,6 @@ if __name__ == "__main__":
         ),
     )
 
-    # --------------------------------------------------------
-    # Simulate execution
-    # --------------------------------------------------------
-
     state = mark_running(
         state
     )
@@ -667,9 +506,6 @@ if __name__ == "__main__":
         "BTA"
     )
 
-    # --------------------------------------------------------
-    # Simulate result
-    # --------------------------------------------------------
 
     state = update_state(
         state,
@@ -684,10 +520,6 @@ if __name__ == "__main__":
     state = mark_complete(
         state
     )
-
-    # --------------------------------------------------------
-    # Display summary
-    # --------------------------------------------------------
 
     summary = state_summary(
         state

@@ -1,9 +1,4 @@
-"""
-Prompt templates for Single Image Analysis (SIA).
 
-These prompts are designed for remote-sensing / satellite
-image understanding using a pretrained Vision-Language Model.
-"""
 
 
 SYSTEM_PROMPT = """
