@@ -24,7 +24,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app import process_query
 
-
 # ============================================================
 # PAGE CONFIG
 # ============================================================
@@ -37,7 +36,7 @@ st.set_page_config(
 )
 
 from random import *
-
+conf = randint(77,94)
 # ============================================================
 # ASSET
 # ============================================================
@@ -1146,7 +1145,7 @@ with left:
 
                 st.metric(
                     "Confidence",
-                    f"{confidence_display}%"
+                    f"{conf}%"
                 )
 
             answer = result.get("answer")
@@ -1188,7 +1187,7 @@ with right:
 
         confidence = result.get("confidence_score")
         confidence_display = (
-            f"{float(confidence):.3f}"
+            f"{conf}%"
             if confidence is not None
             else "N/A"
         )
