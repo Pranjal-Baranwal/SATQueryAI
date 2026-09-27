@@ -1,8 +1,5 @@
-﻿import os
+import os
 import time
-import base64
-import io
-import requests
 from pathlib import Path
 
 import numpy as np
@@ -38,13 +35,6 @@ load_dotenv()
 MODEL_ID = os.getenv(
     "SIA_MODEL_ID",
     "Qingyun/RSCoVLM-7B-2512"
-)
-
-
-# Modal endpoint hosting the fine-tuned Optical + SAR VLM on A10G.
-MODAL_ENDPOINT = os.getenv(
-    "SATQUERY_MODAL_ENDPOINT",
-    "https://trinetrasih--satqueryai-cross-modal-crossmodalvlm-predict.modal.run"
 )
 
 
@@ -153,13 +143,14 @@ class CrossModalInference:
         if self.loaded:
             return
 
+
         print(
             "\n"
             "=================================================="
         )
 
         print(
-            "PREPARING REMOTE FINE-TUNED CROSS-MODAL VLM"
+            "LOADING FINE-TUNED CROSS-MODAL VLM"
         )
 
         print(
@@ -171,21 +162,185 @@ class CrossModalInference:
         )
 
         print(
-            "Execution  : Modal A10G"
+            f"Adapter    : {ADAPTER_PATH}"
         )
 
         print(
-            f"Endpoint   : {MODAL_ENDPOINT}"
+            f"Device     : {self.device}"
         )
 
-        # The VLM itself is NOT loaded on the local machine.
-        # Modal loads the base model + fine-tuned LoRA adapter on A10G.
-        self.model = None
-        self.processor = None
+
+        # ----------------------------------------------------
+        # Verify adapter
+        # ----------------------------------------------------
+
+        if not ADAPTER_PATH.exists():
+
+            raise FileNotFoundError(
+                "\n"
+                "Fine-tuned adapter was not found.\n\n"
+                f"Expected location:\n"
+                f"{ADAPTER_PATH}\n\n"
+                "Make sure the final_adapter folder exists "
+                "inside the SATQueryAI project."
+            )
+
+
+        required_files = [
+
+            ADAPTER_PATH /
+            "adapter_config.json",
+
+            ADAPTER_PATH /
+            "adapter_model.safetensors",
+
+        ]
+
+
+        for file_path in required_files:
+
+            if not file_path.exists():
+
+                raise FileNotFoundError(
+                    "\n"
+                    "Required adapter file is missing:\n"
+                    f"{file_path}"
+                )
+
+
+        # ----------------------------------------------------
+        # Processor
+        # ----------------------------------------------------
+
+        print(
+            "\nLoading processor..."
+        )
+
+
+        self.processor = (
+            AutoProcessor.from_pretrained(
+                self.model_id,
+                trust_remote_code=True
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # GPU
+        # ----------------------------------------------------
+
+        if self.device == "cuda":
+
+            print(
+                "\nUsing 4-bit NF4 quantization."
+            )
+
+            print(
+                f"GPU: "
+                f"{torch.cuda.get_device_name(0)}"
+            )
+
+            print(
+                f"VRAM: "
+                f"{torch.cuda.get_device_properties(0).total_memory / (1024 ** 3):.2f} GB"
+            )
+
+
+            # ------------------------------------------------
+            # Load base RSCoVLM
+            # ------------------------------------------------
+
+            print(
+                "\nLoading base RSCoVLM model..."
+            )
+
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    quantization_config=(
+                        QUANTIZATION_CONFIG
+                    ),
+                    device_map="auto",
+                    trust_remote_code=True,
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # CPU
+        # ----------------------------------------------------
+
+        else:
+
+            print(
+                "\nWARNING: CUDA unavailable."
+            )
+
+            print(
+                "Loading model on CPU."
+            )
+
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch.float32,
+                    device_map="cpu",
+                    trust_remote_code=True,
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # Load YOUR LoRA adapter
+        # ----------------------------------------------------
+
+        print(
+            "\nLoading SATQueryAI fine-tuned LoRA adapter..."
+        )
+
+
+        self.model = (
+            PeftModel.from_pretrained(
+                self.model,
+                str(ADAPTER_PATH),
+                is_trainable=False,
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Evaluation mode
+        # ----------------------------------------------------
+
+        self.model.eval()
+
+
         self.loaded = True
 
+
         print(
-            "\nRemote fine-tuned model ready."
+            "\n"
+            "=================================================="
+        )
+
+        print(
+            "FINE-TUNED MODEL LOADED SUCCESSFULLY"
+        )
+
+        print(
+            "=================================================="
+        )
+
+        print(
+            f"Base model : {self.model_id}"
+        )
+
+        print(
+            f"LoRA       : {ADAPTER_PATH}"
         )
 
 
@@ -529,19 +684,6 @@ USER QUESTION:
     # ANALYZE
     # ========================================================
 
-    @staticmethod
-    def image_to_base64(image):
-
-        """Convert a PIL image to a base64-encoded PNG string."""
-
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-
-        return base64.b64encode(
-            buffer.getvalue()
-        ).decode("utf-8")
-
-
     def analyze(
         self,
         optical_path,
@@ -657,16 +799,61 @@ USER QUESTION:
 
 
         # ----------------------------------------------------
-        # Send Optical + SAR to Modal
+        # Processor
         # ----------------------------------------------------
 
         processing_start = time.time()
 
-        payload = {
-            "sar_image": self.image_to_base64(sar_image),
-            "optical_image": self.image_to_base64(optical_image),
-            "query": query,
-        }
+
+        text = (
+            self.processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        )
+
+
+        # IMPORTANT:
+        #
+        # Image order MUST match message order:
+        #
+        #   message image 1 = SAR
+        #   message image 2 = Optical
+        #
+
+        inputs = (
+            self.processor(
+                text=[text],
+                images=[
+                    sar_image,
+                    optical_image
+                ],
+                padding=True,
+                return_tensors="pt"
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Move tensors to GPU
+        # ----------------------------------------------------
+
+        if self.device == "cuda":
+
+            inputs = {
+
+                key: (
+                    value.to("cuda")
+                    if hasattr(value, "to")
+                    else value
+                )
+
+                for key, value
+                in inputs.items()
+
+            }
+
 
         processing_time = (
             time.time()
@@ -674,40 +861,81 @@ USER QUESTION:
             processing_start
         )
 
+
+        # ----------------------------------------------------
+        # Generate
+        # ----------------------------------------------------
+
         print(
-            "\nSending Optical + SAR to "
-            "fine-tuned VLM on Modal A10G..."
+            "\nGenerating response using "
+            "fine-tuned VLM..."
         )
+
 
         generation_start = time.time()
 
-        response = requests.post(
-            MODAL_ENDPOINT,
-            json=payload,
-            timeout=1800,
-        )
 
-        response.raise_for_status()
+        if self.device == "cuda":
 
-        remote_result = response.json()
+            torch.cuda.synchronize()
 
-        if not remote_result.get("success", False):
-            raise RuntimeError(
-                remote_result.get(
-                    "error",
-                    "Modal Cross-Modal inference failed."
+
+        with torch.inference_mode():
+
+            generated_ids = (
+                self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False
                 )
             )
 
-        answer = str(
-            remote_result.get("answer", "")
-        ).strip()
+
+        if self.device == "cuda":
+
+            torch.cuda.synchronize()
+
 
         generation_time = (
             time.time()
             -
             generation_start
         )
+
+
+        # ----------------------------------------------------
+        # Remove input tokens
+        # ----------------------------------------------------
+
+        input_token_length = (
+            inputs[
+                "input_ids"
+            ].shape[1]
+        )
+
+
+        generated_ids = (
+            generated_ids[
+                :,
+                input_token_length:
+            ]
+        )
+
+
+        # ----------------------------------------------------
+        # Decode
+        # ----------------------------------------------------
+
+        answer = (
+            self.processor.batch_decode(
+                generated_ids,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True
+            )[0]
+        )
+
+
+        answer = answer.strip()
 
 
         # ----------------------------------------------------
@@ -797,7 +1025,7 @@ USER QUESTION:
 
             "answer": answer,
 
-            "device": "Modal A10G",
+            "device": self.device,
 
             "gpu_memory_gb": gpu_memory,
 
@@ -858,7 +1086,7 @@ USER QUESTION:
                 ADAPTER_PATH
             ),
 
-            "device": "Modal A10G",
+            "device": self.device,
 
             "cuda_available": (
                 torch.cuda.is_available()
@@ -918,7 +1146,7 @@ cross_modal_engine = (
 def analyze_cross_modal(
     optical_path,
     sar_path,
-    query = ""
+    query
 ):
 
     return (
@@ -929,16 +1157,6 @@ def analyze_cross_modal(
         )
     )
 
-def run_cross_modal(
-    optical_path,
-    sar_path,
-    query=""
-):
-    return analyze_cross_modal(
-        optical_path=optical_path,
-        sar_path=sar_path,
-        query=query
-    )
 
 # ============================================================
 # DIRECT TEST

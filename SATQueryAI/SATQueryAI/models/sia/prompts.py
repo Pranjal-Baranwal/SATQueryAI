@@ -315,20 +315,10 @@ Additional user request:
 GROUNDING_PROMPT_TEMPLATE = """
 You are performing visual grounding on a satellite image.
 
-Task: Localize EVERY region in the image that matches the
+Task: Localize every region in the image that matches the
 following request:
 
 {query}
-
-Be exhaustive. Scan the entire image systematically, from
-top-left to bottom-right, before answering. Satellite images
-frequently contain many separate instances of the same
-feature (for example, several distinct clusters of trees,
-several buildings, several patches of water). Report ALL of
-them, not just the one or two most obvious instances. Include
-small or partially visible instances as long as they are
-visually supported. Under-reporting is a more serious error
-than over-reporting borderline cases at "low" confidence.
 
 Respond with ONLY a JSON object, with no other text, no
 markdown code fences, and no explanation, in exactly this
@@ -342,8 +332,7 @@ Rules:
    and (1000, 1000) is the bottom-right corner.
 2. x1 must be less than x2, and y1 must be less than y2.
 3. Include one entry per distinct, spatially separate region
-   that matches the request. Do not merge separate instances
-   into a single box unless they are contiguous.
+   that matches the request.
 4. If nothing in the image matches the request, respond with
    {{"objects": []}}.
 5. Do not invent regions that are not visually supported.

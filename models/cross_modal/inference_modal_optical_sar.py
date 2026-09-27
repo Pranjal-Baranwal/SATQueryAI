@@ -1,4 +1,4 @@
-﻿import os
+import os
 import time
 import base64
 import io
@@ -918,7 +918,7 @@ cross_modal_engine = (
 def analyze_cross_modal(
     optical_path,
     sar_path,
-    query = ""
+    query
 ):
 
     return (
@@ -929,16 +929,6 @@ def analyze_cross_modal(
         )
     )
 
-def run_cross_modal(
-    optical_path,
-    sar_path,
-    query=""
-):
-    return analyze_cross_modal(
-        optical_path=optical_path,
-        sar_path=sar_path,
-        query=query
-    )
 
 # ============================================================
 # DIRECT TEST

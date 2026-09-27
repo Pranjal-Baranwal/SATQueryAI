@@ -1,11 +1,15 @@
 import os
-import base64
-import io
-import requests
 from pathlib import Path
 
+import torch
 from PIL import Image
 from dotenv import load_dotenv
+
+from transformers import (
+    AutoProcessor,
+    Qwen2_5_VLForConditionalGeneration,
+    BitsAndBytesConfig,
+)
 
 from models.sia.prompts import (
     SYSTEM_PROMPT,
@@ -33,35 +37,37 @@ from geospatial.visualization import (
 load_dotenv()
 
 
-# ============================================================
-# MODEL CONFIGURATION
-# ============================================================
 
-MODEL_ID = "Qingyun/RSCoVLM-7B-2512"
-
-MODAL_SIA_ENDPOINT = (
-    "https://trinetrasih--satqueryai-base-models-basevlm-sia.modal.run"
+MODEL_ID = os.getenv(
+    "SIA_MODEL_ID",
+    "Qingyun/RSCoVLM-7B-2512"
 )
 
-DEVICE = "Modal A10G"
+CUDA_AVAILABLE = torch.cuda.is_available()
+
+DEVICE = "cuda" if CUDA_AVAILABLE else "cpu"
 
 
-# ============================================================
-# SIA INFERENCE ENGINE
-# ============================================================
+
+QUANTIZATION_CONFIG = None
+
+if CUDA_AVAILABLE:
+
+    QUANTIZATION_CONFIG = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    )
+
+
 
 class SIAInference:
     """
     Single Image Analysis inference engine.
 
-    Image preprocessing and prompt construction happen locally.
-
-    The actual RSCoVLM-7B inference runs remotely on:
-        Modal A10G
-
-    IMPORTANT:
-        This uses ONLY the base model.
-        No fine-tuned LoRA adapter is used.
+    Uses a pretrained remote-sensing Vision-Language Model
+    with 4-bit quantization for memory-efficient inference.
     """
 
     def __init__(
@@ -73,38 +79,97 @@ class SIAInference:
         self.model_id = model_id
         self.device = device
 
-        # No local model is loaded.
         self.model = None
         self.processor = None
 
         self.loaded = False
 
 
-    # ========================================================
-    # MODEL
-    # ========================================================
-
     def load_model(self):
         """
-        The model runs remotely on Modal A10G.
+        Load the pretrained VLM.
 
-        Nothing is loaded onto the local machine.
-        No LoRA adapter is used.
+        On CUDA:
+            Uses 4-bit quantization.
+
+        On CPU:
+            Uses float32.
         """
 
         if self.loaded:
             return
 
-        print("\nSIA model: Modal A10G")
-        print("Model: Qingyun/RSCoVLM-7B-2512")
-        print("Adapter: None")
+        print(
+            f"\nLoading SIA model: {self.model_id}"
+        )
+
+        print(
+            f"Device: {self.device}"
+        )
+
+
+        self.processor = AutoProcessor.from_pretrained(
+            self.model_id,
+            trust_remote_code=True
+        )
+
+
+        if self.device == "cuda":
+
+            print(
+                "Using 4-bit quantization."
+            )
+
+            print(
+                f"GPU: "
+                f"{torch.cuda.get_device_name(0)}"
+            )
+
+            print(
+                f"VRAM: "
+                f"{torch.cuda.get_device_properties(0).total_memory / (1024 ** 3):.2f} GB"
+            )
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    quantization_config=QUANTIZATION_CONFIG,
+                    device_map="auto",
+                    dtype=torch.float16,
+                    trust_remote_code=True
+                )
+            )
+
+
+        else:
+
+            print(
+                "WARNING: CUDA is unavailable."
+            )
+
+            print(
+                "Loading model on CPU."
+            )
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    dtype=torch.float32,
+                    device_map="cpu",
+                    trust_remote_code=True
+                )
+            )
+
+        self.model.eval()
 
         self.loaded = True
 
+        print(
+            "\nSIA model loaded successfully."
+        )
 
-    # ========================================================
-    # IMAGE VALIDATION
-    # ========================================================
 
     @staticmethod
     def validate_image(image_path):
@@ -138,11 +203,6 @@ class SIAInference:
 
         return image_path
 
-
-    # ========================================================
-    # IMAGE LOADING
-    # ========================================================
-
     @staticmethod
     def load_image(image_path):
 
@@ -159,11 +219,6 @@ class SIAInference:
         )
 
         return image
-
-
-    # ========================================================
-    # PROMPT BUILDING
-    # ========================================================
 
     @staticmethod
     def build_prompt(
@@ -231,10 +286,6 @@ class SIAInference:
             )
 
 
-    # ========================================================
-    # MESSAGE CREATION
-    # ========================================================
-
     @staticmethod
     def create_messages(prompt):
 
@@ -262,11 +313,6 @@ class SIAInference:
             }
         ]
 
-
-    # ========================================================
-    # SIA ANALYSIS
-    # ========================================================
-
     def analyze(
         self,
         image_path,
@@ -277,16 +323,6 @@ class SIAInference:
     ):
         """
         Perform Single Image Analysis.
-
-        Local:
-            - image validation
-            - image loading
-            - RGB conversion
-            - prompt construction
-
-        Modal:
-            - RSCoVLM-7B base model
-            - GPU inference on A10G
         """
 
         if not query or not query.strip():
@@ -295,26 +331,13 @@ class SIAInference:
                 "Query cannot be empty."
             )
 
-
-        # ----------------------------------------------------
-        # Make sure remote model is considered ready
-        # ----------------------------------------------------
-
         self.load_model()
 
-
-        # ----------------------------------------------------
-        # Load image locally
-        # ----------------------------------------------------
 
         image = self.load_image(
             image_path
         )
 
-
-        # ----------------------------------------------------
-        # Build SIA prompt locally
-        # ----------------------------------------------------
 
         prompt = self.build_prompt(
             query=query,
@@ -322,111 +345,101 @@ class SIAInference:
         )
 
 
-        # ----------------------------------------------------
-        # Encode image as PNG -> Base64
-        # ----------------------------------------------------
-
-        buffer = io.BytesIO()
-
-        image.save(
-            buffer,
-            format="PNG"
+        messages = self.create_messages(
+            prompt
         )
 
-        image_base64 = base64.b64encode(
-            buffer.getvalue()
-        ).decode("utf-8")
+
+        text = self.processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
 
 
-        # ----------------------------------------------------
-        # Prepare Modal request
-        # ----------------------------------------------------
+        inputs = self.processor(
+            text=[text],
+            images=[image],
+            padding=True,
+            return_tensors="pt"
+        )
 
-        payload = {
-            "image": image_base64,
-            "query": query,
-            "prompt": prompt,
-            "system_prompt": SYSTEM_PROMPT,
-            "max_new_tokens": max_new_tokens,
-        }
+        if self.device == "cuda":
+
+            inputs = {
+                key: value.to("cuda")
+                if hasattr(value, "to")
+                else value
+                for key, value in inputs.items()
+            }
+
+        else:
+
+            inputs = {
+                key: value.to("cpu")
+                if hasattr(value, "to")
+                else value
+                for key, value in inputs.items()
+            }
 
 
         print(
-            "\nSending SIA request to Modal A10G..."
+            "\nGenerating SIA response..."
         )
 
+        generation_kwargs = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": temperature > 0
+        }
 
-        # ----------------------------------------------------
-        # Call Modal endpoint
-        # ----------------------------------------------------
+        if temperature > 0:
+            generation_kwargs["temperature"] = temperature
 
-        try:
+        with torch.inference_mode():
 
-            response = requests.post(
-                MODAL_SIA_ENDPOINT,
-                json=payload,
-                timeout=1800
-            )
-
-            response.raise_for_status()
-
-        except requests.RequestException as e:
-
-            raise RuntimeError(
-                f"Modal SIA request failed: {e}"
-            ) from e
-
-
-        # ----------------------------------------------------
-        # Read Modal response
-        # ----------------------------------------------------
-
-        try:
-
-            result = response.json()
-
-        except ValueError as e:
-
-            raise RuntimeError(
-                "Modal SIA returned an invalid JSON response."
-            ) from e
-
-
-        if not result.get("success", True):
-
-            raise RuntimeError(
-                result.get(
-                    "error",
-                    "Unknown error from Modal SIA."
-                )
+            generated_ids = self.model.generate(
+                **inputs,
+                **generation_kwargs
             )
 
 
-        answer = result.get(
-            "answer",
-            ""
+        input_token_length = (
+            inputs["input_ids"].shape[1]
         )
+
+        generated_ids = generated_ids[
+            :,
+            input_token_length:
+        ]
+
+
+        answer = self.processor.batch_decode(
+            generated_ids,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True
+        )[0]
 
         answer = answer.strip()
 
 
-        # ----------------------------------------------------
-        # Return standard SIA result
-        # ----------------------------------------------------
+        gpu_memory = None
 
+        if self.device == "cuda":
+
+            gpu_memory = round(
+                torch.cuda.memory_allocated()
+                / (1024 ** 3),
+                2
+            )
         return {
             "model": self.model_id,
             "analysis_type": analysis_type,
             "query": query,
             "answer": answer,
-            "device": "Modal A10G",
-            "gpu_memory_gb": None
+            "device": self.device,
+            "gpu_memory_gb": gpu_memory
         }
 
-
-    # ========================================================
-    # SIMPLE ASK INTERFACE
-    # ========================================================
 
     def ask(
         self,
@@ -443,31 +456,23 @@ class SIAInference:
         return result["answer"]
 
 
-    # ========================================================
-    # VISUAL GROUNDING
-    # ========================================================
-
     def ground(
         self,
         image_path,
         query,
-        max_new_tokens=1024,
+        max_new_tokens=512,
         output_path=None
     ):
         """
         Localize the region(s) requested in `query` and return
         an annotated image highlighting them.
 
-        Remote:
-            RSCoVLM-7B on Modal is asked (via the same /sia
-            endpoint used by analyze()) to return normalized
-            bounding boxes as JSON.
-
-        Local:
-            The JSON is parsed, rasterized into a mask, and
-            rendered with geospatial.visualization.SpatialVisualizer
-            so the same highlight styling used for change masks
-            elsewhere in the app is reused here.
+        The model is asked to return normalized bounding boxes
+        as JSON (see models.sia.prompts.build_grounding_prompt).
+        Boxes are rasterized into a mask and rendered with
+        geospatial.visualization.SpatialVisualizer so the same
+        highlight styling used for change masks elsewhere in
+        the app is reused here.
         """
 
         if not query or not query.strip():
@@ -488,68 +493,52 @@ class SIAInference:
             query
         )
 
-        buffer = io.BytesIO()
-
-        image.save(
-            buffer,
-            format="PNG"
+        messages = self.create_messages(
+            prompt
         )
 
-        image_base64 = base64.b64encode(
-            buffer.getvalue()
-        ).decode("utf-8")
+        text = self.processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
 
-        payload = {
-            "image": image_base64,
-            "query": query,
-            "prompt": prompt,
-            "system_prompt": SYSTEM_PROMPT,
-            "max_new_tokens": max_new_tokens,
+        inputs = self.processor(
+            text=[text],
+            images=[image],
+            padding=True,
+            return_tensors="pt"
+        )
+
+        inputs = {
+            key: value.to(self.device)
+            if hasattr(value, "to")
+            else value
+            for key, value in inputs.items()
         }
 
-        print(
-            "\nSending grounding request to Modal A10G..."
+        with torch.inference_mode():
+
+            generated_ids = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False
+            )
+
+        input_token_length = (
+            inputs["input_ids"].shape[1]
         )
 
-        try:
+        generated_ids = generated_ids[
+            :,
+            input_token_length:
+        ]
 
-            response = requests.post(
-                MODAL_SIA_ENDPOINT,
-                json=payload,
-                timeout=1800
-            )
-
-            response.raise_for_status()
-
-        except requests.RequestException as e:
-
-            raise RuntimeError(
-                f"Modal SIA request failed: {e}"
-            ) from e
-
-        try:
-
-            result = response.json()
-
-        except ValueError as e:
-
-            raise RuntimeError(
-                "Modal SIA returned an invalid JSON response."
-            ) from e
-
-        if not result.get("success", True):
-
-            raise RuntimeError(
-                result.get(
-                    "error",
-                    "Unknown error from Modal SIA."
-                )
-            )
-
-        raw_response = result.get(
-            "answer",
-            ""
-        ).strip()
+        raw_response = self.processor.batch_decode(
+            generated_ids,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True
+        )[0].strip()
 
         objects = parse_grounding_response(
             raw_response,
@@ -612,7 +601,6 @@ class SIAInference:
             "objects": objects,
             "image_width": image_width,
             "image_height": image_height,
-            "device": "Modal A10G",
             "image_path": (
                 str(output_path)
                 if output_path
@@ -621,49 +609,42 @@ class SIAInference:
         }
 
 
-    # ========================================================
-    # STATUS
-    # ========================================================
-
     def status(self):
 
         return {
             "model_id": self.model_id,
             "device": self.device,
-            "cuda_available": False,
-            "loaded": self.loaded,
-            "adapter": None,
-            "remote": True
+            "cuda_available": CUDA_AVAILABLE,
+            "loaded": self.loaded
         }
 
 
-    # ========================================================
-    # UNLOAD
-    # ========================================================
-
     def unload_model(self):
 
-        # Nothing is loaded locally.
+        if self.model is not None:
+
+            del self.model
+
+        if self.processor is not None:
+
+            del self.processor
 
         self.model = None
         self.processor = None
         self.loaded = False
 
+        if torch.cuda.is_available():
+
+            torch.cuda.empty_cache()
+
         print(
-            "SIA remote model connection reset."
+            "SIA model unloaded."
         )
 
 
-# ============================================================
-# GLOBAL SIA ENGINE
-# ============================================================
 
 sia_engine = SIAInference()
 
-
-# ============================================================
-# PUBLIC API
-# ============================================================
 
 def analyze_image(
     image_path,
@@ -686,7 +667,7 @@ def run_sia(
     """
     Execute SIA through the routing pipeline.
 
-    Used by routing.graph / app.py.
+    This function is used by routing.graph / app.py.
     """
 
     return sia_engine.analyze(
@@ -719,7 +700,7 @@ def run_grounding(
     """
     Execute visual grounding through the routing pipeline.
 
-    Used by routing.graph / app.py.
+    This function is used by routing.graph / app.py.
     """
 
     return sia_engine.ground(
@@ -728,9 +709,6 @@ def run_grounding(
     )
 
 
-# ============================================================
-# DIRECT TEST
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -741,26 +719,17 @@ if __name__ == "__main__":
         "in this satellite image."
     )
 
-
     print(
         "\n========== SIA TEST =========="
     )
-
 
     print(
         f"Model : {MODEL_ID}"
     )
 
-
-    print(
-        "Adapter: None"
-    )
-
-
     print(
         f"Device: {DEVICE}"
     )
-
 
     try:
 
@@ -770,7 +739,6 @@ if __name__ == "__main__":
             analysis_type="general"
         )
 
-
         print(
             "\nModel Answer:"
         )
@@ -778,7 +746,6 @@ if __name__ == "__main__":
         print(
             result["answer"]
         )
-
 
         print(
             "\nModel:"
@@ -788,7 +755,6 @@ if __name__ == "__main__":
             result["model"]
         )
 
-
         print(
             "\nDevice:"
         )
@@ -797,20 +763,16 @@ if __name__ == "__main__":
             result["device"]
         )
 
+        if result["gpu_memory_gb"] is not None:
 
-        print(
-            "\nAdapter:"
-        )
-
-        print(
-            "None"
-        )
-
+            print(
+                f"\nGPU memory allocated: "
+                f"{result['gpu_memory_gb']} GB"
+            )
 
         print(
             "\n==============================\n"
         )
-
 
     except Exception as e:
 

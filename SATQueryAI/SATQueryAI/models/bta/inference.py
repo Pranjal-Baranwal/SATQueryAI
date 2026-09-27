@@ -1,15 +1,19 @@
 import os
 import time
-import base64
-import io
 from pathlib import Path
 
-import requests
+import torch
 import rasterio
 import numpy as np
 
 from PIL import Image
 from dotenv import load_dotenv
+
+from transformers import (
+    AutoProcessor,
+    Qwen2_5_VLForConditionalGeneration,
+    BitsAndBytesConfig,
+)
 
 from models.bta.prompts import (
     SYSTEM_PROMPT,
@@ -25,20 +29,21 @@ from models.bta.prompts import (
 )
 
 
+
 load_dotenv()
 
 
-# ============================================================
-# MODEL CONFIGURATION
-# ============================================================
 
-MODEL_ID = "Qingyun/RSCoVLM-7B-2512"
-
-MODAL_BTA_ENDPOINT = (
-    "https://trinetrasih--satqueryai-base-models-basevlm-bta.modal.run"
+MODEL_ID = os.getenv(
+    "SIA_MODEL_ID",
+    "Qingyun/RSCoVLM-7B-2512"
 )
 
-DEVICE = "Modal A10G"
+DEVICE = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "cpu"
+)
 
 MAX_IMAGE_SIZE = 1024
 
@@ -47,28 +52,21 @@ DEFAULT_MAX_NEW_TOKENS = 128
 DEFAULT_TEMPERATURE = 0.0
 
 
-# ============================================================
-# BTA INFERENCE ENGINE
-# ============================================================
+
+QUANTIZATION_CONFIG = None
+
+if DEVICE == "cuda":
+
+    QUANTIZATION_CONFIG = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    )
+
+
 
 class BTAInference:
-    """
-    Bi-Temporal Analysis inference engine.
-
-    Local:
-        - T1/T2 image loading
-        - GeoTIFF processing
-        - RGB conversion
-        - resizing
-        - prompt construction
-
-    Modal:
-        - RSCoVLM-7B base model
-        - A10G GPU inference
-
-    IMPORTANT:
-        No fine-tuned LoRA adapter is used.
-    """
 
     def __init__(
         self,
@@ -79,38 +77,89 @@ class BTAInference:
         self.model_id = model_id
         self.device = device
 
-        # No local VLM is loaded.
         self.model = None
         self.processor = None
 
         self.loaded = False
 
 
-    # ========================================================
-    # MODEL
-    # ========================================================
 
     def load_model(self):
-        """
-        BTA model runs remotely on Modal A10G.
-
-        Nothing is loaded locally.
-        No LoRA adapter is used.
-        """
 
         if self.loaded:
             return
 
-        print("\nBTA model: Modal A10G")
-        print("Model: Qingyun/RSCoVLM-7B-2512")
-        print("Adapter: None")
+        print(
+            f"\nLoading BTA model: {self.model_id}"
+        )
+
+        print(
+            f"Device: {self.device}"
+        )
+
+
+        self.processor = AutoProcessor.from_pretrained(
+            self.model_id,
+            trust_remote_code=True
+        )
+
+
+        if self.device == "cuda":
+
+            print(
+                "Using 4-bit quantization."
+            )
+
+            print(
+                f"GPU: "
+                f"{torch.cuda.get_device_name(0)}"
+            )
+
+            print(
+                f"VRAM: "
+                f"{torch.cuda.get_device_properties(0).total_memory / (1024 ** 3):.2f} GB"
+            )
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    quantization_config=QUANTIZATION_CONFIG,
+                    device_map="auto",
+                    dtype=torch.float16,
+                    trust_remote_code=True
+                )
+            )
+
+        else:
+
+            print(
+                "WARNING: CUDA unavailable."
+            )
+
+            print(
+                "Loading BTA model on CPU."
+            )
+
+            self.model = (
+                Qwen2_5_VLForConditionalGeneration
+                .from_pretrained(
+                    self.model_id,
+                    dtype=torch.float32,
+                    device_map="cpu",
+                    trust_remote_code=True
+                )
+            )
+
+        self.model.eval()
 
         self.loaded = True
 
+        print(
+            "\nBTA model loaded successfully."
+        )
 
-    # ========================================================
-    # GEOTIFF / IMAGE LOADING
-    # ========================================================
+
 
     @staticmethod
     def load_geotiff(
@@ -134,10 +183,6 @@ class BTAInference:
         suffix = image_path.suffix.lower()
 
 
-        # ----------------------------------------------------
-        # Standard image
-        # ----------------------------------------------------
-
         if suffix in [
             ".png",
             ".jpg",
@@ -157,10 +202,6 @@ class BTAInference:
             )
 
 
-        # ----------------------------------------------------
-        # GeoTIFF
-        # ----------------------------------------------------
-
         else:
 
             print(
@@ -173,10 +214,6 @@ class BTAInference:
 
                 band_count = src.count
 
-
-                # --------------------------------------------
-                # Single band
-                # --------------------------------------------
 
                 if band_count == 1:
 
@@ -234,10 +271,6 @@ class BTAInference:
                         axis=-1
                     )
 
-
-                # --------------------------------------------
-                # Three or more bands
-                # --------------------------------------------
 
                 else:
 
@@ -299,16 +332,10 @@ class BTAInference:
                         axis=-1
                     )
 
-
             image = Image.fromarray(
                 rgb,
                 mode="RGB"
             )
-
-
-        # ----------------------------------------------------
-        # Resize
-        # ----------------------------------------------------
 
         original_size = image.size
 
@@ -333,9 +360,6 @@ class BTAInference:
         return image
 
 
-    # ========================================================
-    # PROMPT BUILDING
-    # ========================================================
 
     @staticmethod
     def build_prompt(
@@ -407,10 +431,6 @@ class BTAInference:
             )
 
 
-    # ========================================================
-    # MESSAGE CREATION
-    # ========================================================
-
     @staticmethod
     def create_messages(
         prompt
@@ -431,7 +451,6 @@ class BTAInference:
             {
                 "role": "user",
                 "content": [
-
                     {
                         "type": "image"
                     },
@@ -444,39 +463,11 @@ class BTAInference:
                         "type": "text",
                         "text": prompt
                     }
-
                 ]
             }
-
         ]
 
 
-    # ========================================================
-    # IMAGE -> BASE64
-    # ========================================================
-
-    @staticmethod
-    def image_to_base64(
-        image
-    ):
-
-        buffer = io.BytesIO()
-
-        image.save(
-            buffer,
-            format="PNG"
-        )
-
-        return base64.b64encode(
-            buffer.getvalue()
-        ).decode(
-            "utf-8"
-        )
-
-
-    # ========================================================
-    # BTA ANALYSIS
-    # ========================================================
 
     def analyze(
         self,
@@ -494,13 +485,8 @@ class BTAInference:
                 "Query cannot be empty."
             )
 
-
         total_start = time.time()
 
-
-        # ----------------------------------------------------
-        # Remote model
-        # ----------------------------------------------------
 
         model_start = time.time()
 
@@ -512,10 +498,6 @@ class BTAInference:
         )
 
 
-        # ----------------------------------------------------
-        # Load T1
-        # ----------------------------------------------------
-
         image_start = time.time()
 
         print(
@@ -526,11 +508,6 @@ class BTAInference:
             image_t1_path
         )
 
-
-        # ----------------------------------------------------
-        # Load T2
-        # ----------------------------------------------------
-
         print(
             "\n========== T2 =========="
         )
@@ -539,16 +516,11 @@ class BTAInference:
             image_t2_path
         )
 
-
         image_time = (
             time.time()
             - image_start
         )
 
-
-        # ----------------------------------------------------
-        # Build prompt locally
-        # ----------------------------------------------------
 
         prompt = self.build_prompt(
             query=query,
@@ -556,18 +528,26 @@ class BTAInference:
         )
 
 
-        # ----------------------------------------------------
-        # Encode images
-        # ----------------------------------------------------
+        messages = self.create_messages(
+            prompt
+        )
 
         processing_start = time.time()
 
-        image_t1_base64 = self.image_to_base64(
-            image_t1
+        text = self.processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
         )
 
-        image_t2_base64 = self.image_to_base64(
-            image_t2
+        inputs = self.processor(
+            text=[text],
+            images=[
+                image_t1,
+                image_t2
+            ],
+            padding=True,
+            return_tensors="pt"
         )
 
         processing_time = (
@@ -575,47 +555,36 @@ class BTAInference:
             - processing_start
         )
 
+        if self.device == "cuda":
 
-        # ----------------------------------------------------
-        # Prepare Modal payload
-        # ----------------------------------------------------
+            inputs = {
+                key: value.to("cuda")
+                if hasattr(value, "to")
+                else value
+                for key, value in inputs.items()
+            }
 
-        payload = {
-            "image_t1": image_t1_base64,
-            "image_t2": image_t2_base64,
-            "query": query,
-            "prompt": prompt,
-            "system_prompt": SYSTEM_PROMPT,
-            "max_new_tokens": max_new_tokens,
-        }
+        if self.device == "cuda":
 
-
-        # ----------------------------------------------------
-        # Call Modal A10G
-        # ----------------------------------------------------
+            torch.cuda.synchronize()
 
         print(
-            "\nSending T1 + T2 to Modal A10G..."
+            "\nGenerating BTA response..."
         )
 
         generation_start = time.time()
 
-        try:
+        with torch.inference_mode():
 
-            response = requests.post(
-                MODAL_BTA_ENDPOINT,
-                json=payload,
-                timeout=1800
+            generated_ids = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False
             )
 
-            response.raise_for_status()
+        if self.device == "cuda":
 
-        except requests.RequestException as e:
-
-            raise RuntimeError(
-                f"Modal BTA request failed: {e}"
-            ) from e
-
+            torch.cuda.synchronize()
 
         generation_time = (
             time.time()
@@ -623,55 +592,41 @@ class BTAInference:
         )
 
 
-        # ----------------------------------------------------
-        # Read response
-        # ----------------------------------------------------
-
-        try:
-
-            result = response.json()
-
-        except ValueError as e:
-
-            raise RuntimeError(
-                "Modal BTA returned invalid JSON."
-            ) from e
-
-
-        if not result.get(
-            "success",
-            True
-        ):
-
-            raise RuntimeError(
-                result.get(
-                    "error",
-                    "Unknown error from Modal BTA."
-                )
-            )
-
-
-        answer = result.get(
-            "answer",
-            ""
+        input_token_length = (
+            inputs["input_ids"].shape[1]
         )
+
+        generated_ids = generated_ids[
+            :,
+            input_token_length:
+        ]
+
+
+        answer = self.processor.batch_decode(
+            generated_ids,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True
+        )[0]
 
         answer = answer.strip()
 
 
-        # ----------------------------------------------------
-        # Total timing
-        # ----------------------------------------------------
+        gpu_memory = None
+
+        if self.device == "cuda":
+
+            gpu_memory = round(
+                torch.cuda.memory_allocated()
+                /
+                (1024 ** 3),
+                2
+            )
+
 
         total_time = (
             time.time()
             - total_start
         )
-
-
-        # ----------------------------------------------------
-        # Timing display
-        # ----------------------------------------------------
 
         print(
             "\n========== BTA TIMING =========="
@@ -707,10 +662,6 @@ class BTAInference:
         )
 
 
-        # ----------------------------------------------------
-        # Return standard BTA result
-        # ----------------------------------------------------
-
         return {
 
             "model": self.model_id,
@@ -729,9 +680,9 @@ class BTAInference:
 
             "answer": answer,
 
-            "device": "Modal A10G",
+            "device": self.device,
 
-            "gpu_memory_gb": None,
+            "gpu_memory_gb": gpu_memory,
 
             "generation_time_seconds": round(
                 generation_time,
@@ -742,13 +693,8 @@ class BTAInference:
                 total_time,
                 2
             )
-
         }
 
-
-    # ========================================================
-    # SIMPLE COMPARE INTERFACE
-    # ========================================================
 
     def compare(
         self,
@@ -774,9 +720,6 @@ class BTAInference:
         return result["answer"]
 
 
-    # ========================================================
-    # STATUS
-    # ========================================================
 
     def status(self):
 
@@ -786,24 +729,23 @@ class BTAInference:
 
             "device": self.device,
 
-            "cuda_available": False,
+            "cuda_available":
+                torch.cuda.is_available(),
 
-            "loaded": self.loaded,
-
-            "adapter": None,
-
-            "remote": True
-
+            "loaded":
+                self.loaded
         }
 
 
-    # ========================================================
-    # UNLOAD
-    # ========================================================
-
     def unload_model(self):
 
-        # Nothing is loaded locally.
+        if self.model is not None:
+
+            del self.model
+
+        if self.processor is not None:
+
+            del self.processor
 
         self.model = None
 
@@ -811,21 +753,18 @@ class BTAInference:
 
         self.loaded = False
 
+        if torch.cuda.is_available():
+
+            torch.cuda.empty_cache()
+
         print(
-            "BTA remote model connection reset."
+            "BTA model unloaded."
         )
 
-
-# ============================================================
-# GLOBAL BTA ENGINE
-# ============================================================
 
 bta_engine = BTAInference()
 
 
-# ============================================================
-# PUBLIC API
-# ============================================================
 
 def analyze_change(
     image_t1_path,
@@ -846,6 +785,7 @@ def analyze_change(
     )
 
 
+
 def run_bta(
     t1_path,
     t2_path,
@@ -855,7 +795,7 @@ def run_bta(
     """
     Interface used by routing.graph.
 
-    This is only a wrapper around the BTA engine.
+    This is only a wrapper around the existing BTA engine.
     """
 
     return bta_engine.analyze(
@@ -870,9 +810,6 @@ def run_bta(
     )
 
 
-# ============================================================
-# DIRECT TEST
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -889,26 +826,17 @@ if __name__ == "__main__":
         "between the two images?"
     )
 
-
     print(
         "\n========== BTA TEST =========="
     )
-
 
     print(
         f"Model : {MODEL_ID}"
     )
 
-
-    print(
-        "Adapter: None"
-    )
-
-
     print(
         f"Device: {DEVICE}"
     )
-
 
     try:
 
@@ -923,7 +851,6 @@ if __name__ == "__main__":
             analysis_type="general"
         )
 
-
         print(
             "\nBTA Answer:"
         )
@@ -931,7 +858,6 @@ if __name__ == "__main__":
         print(
             result["answer"]
         )
-
 
         print(
             "\nModel:"
@@ -941,7 +867,6 @@ if __name__ == "__main__":
             result["model"]
         )
 
-
         print(
             "\nDevice:"
         )
@@ -950,20 +875,16 @@ if __name__ == "__main__":
             result["device"]
         )
 
+        if result["gpu_memory_gb"] is not None:
 
-        print(
-            "\nAdapter:"
-        )
-
-        print(
-            "None"
-        )
-
+            print(
+                f"\nGPU memory allocated: "
+                f"{result['gpu_memory_gb']} GB"
+            )
 
         print(
             "\n==============================\n"
         )
-
 
     except Exception as e:
 
