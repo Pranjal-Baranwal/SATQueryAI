@@ -2,9 +2,15 @@
 Visual Grounding Utilities
 ===========================
 
-Parses the JSON bounding-box output produced by the SIA
-grounding prompt and converts it into pixel-space boxes and
+Parses the JSON point-grounding output produced by the SIA
+grounding prompt and converts it into pixel-space points and
 masks usable by geospatial.visualization.SpatialVisualizer.
+
+Points (not boxes) are used as the VLM's output format because
+they are a much lower-precision target for a general VLM to get
+right (2 numbers instead of 4), and a single point that lands
+anywhere inside the true object is enough for SAM to recover
+the full, correct boundary.
 """
 
 import json
@@ -68,36 +74,103 @@ def _extract_json_object(text):
     return None
 
 
-def _extract_boxes_fallback(text):
+def _extract_points_fallback(text):
     """
     Fallback extraction when the model output is not valid JSON.
 
-    Looks for any [x1, y1, x2, y2]-shaped array in the text.
+    Looks for any [x, y]-shaped array in the text. If none are
+    found, falls back further to [x1, y1, x2, y2]-shaped boxes
+    (from an older prompt/response format) and uses their center.
     """
 
     if not text:
         return []
 
-    pattern = re.compile(
-        r"\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*"
-        r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]"
+    point_pattern = re.compile(
+        r"\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]"
     )
 
-    boxes = []
+    points = []
 
-    for match in pattern.finditer(text):
+    for match in point_pattern.finditer(text):
 
-        values = [float(value) for value in match.groups()]
+        x, y = [float(value) for value in match.groups()]
 
-        boxes.append(
+        points.append(
             {
                 "label": "region",
-                "box": values,
+                "point": [x, y],
+                "location_hint": "",
                 "confidence": "medium",
             }
         )
 
-    return boxes
+    if points:
+        return points
+
+    box_pattern = re.compile(
+        r"\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*"
+        r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]"
+    )
+
+    for match in box_pattern.finditer(text):
+
+        x1, y1, x2, y2 = [float(value) for value in match.groups()]
+
+        points.append(
+            {
+                "label": "region",
+                "point": [
+                    (x1 + x2) / 2.0,
+                    (y1 + y2) / 2.0,
+                ],
+                "location_hint": "",
+                "confidence": "medium",
+            }
+        )
+
+    return points
+
+
+def _point_from_item(item):
+    """
+    Extract a normalized [x, y] point from one parsed object,
+    accepting either the current "point" format or the older
+    "box" format (using its center) for resilience.
+    """
+
+    point = item.get("point")
+
+    if (
+        isinstance(point, (list, tuple))
+        and len(point) == 2
+    ):
+
+        try:
+            return [float(point[0]), float(point[1])]
+
+        except (TypeError, ValueError):
+            return None
+
+    box = item.get("box")
+
+    if (
+        isinstance(box, (list, tuple))
+        and len(box) == 4
+    ):
+
+        try:
+            x1, y1, x2, y2 = [float(value) for value in box]
+
+        except (TypeError, ValueError):
+            return None
+
+        return [
+            (x1 + x2) / 2.0,
+            (y1 + y2) / 2.0,
+        ]
+
+    return None
 
 
 def parse_grounding_response(
@@ -114,8 +187,9 @@ def parse_grounding_response(
             {
                 "label": str,
                 "confidence": str,
-                "box_normalized": [x1, y1, x2, y2],
-                "box": [x1, y1, x2, y2],  # pixel coordinates
+                "location_hint": str,
+                "point_normalized": [x, y],
+                "point": [x, y],  # pixel coordinates
             }
     """
 
@@ -129,7 +203,7 @@ def parse_grounding_response(
 
     if not isinstance(raw_objects, list):
 
-        raw_objects = _extract_boxes_fallback(text)
+        raw_objects = _extract_points_fallback(text)
 
     objects = []
 
@@ -138,39 +212,19 @@ def parse_grounding_response(
         if not isinstance(item, dict):
             continue
 
-        box = item.get("box")
+        point = _point_from_item(item)
 
-        if (
-            not isinstance(box, (list, tuple))
-            or len(box) != 4
-        ):
+        if point is None:
             continue
 
-        try:
-            x1, y1, x2, y2 = [float(value) for value in box]
+        x, y = point
 
-        except (TypeError, ValueError):
-            continue
+        x = max(0.0, min(1000.0, x))
+        y = max(0.0, min(1000.0, y))
 
-        if x1 > x2:
-            x1, x2 = x2, x1
-
-        if y1 > y2:
-            y1, y2 = y2, y1
-
-        x1 = max(0.0, min(1000.0, x1))
-        x2 = max(0.0, min(1000.0, x2))
-        y1 = max(0.0, min(1000.0, y1))
-        y2 = max(0.0, min(1000.0, y2))
-
-        if x2 <= x1 or y2 <= y1:
-            continue
-
-        pixel_box = [
-            x1 / 1000.0 * image_width,
-            y1 / 1000.0 * image_height,
-            x2 / 1000.0 * image_width,
-            y2 / 1000.0 * image_height,
+        pixel_point = [
+            x / 1000.0 * image_width,
+            y / 1000.0 * image_height,
         ]
 
         confidence = str(
@@ -184,24 +238,31 @@ def parse_grounding_response(
             item.get("label", "region")
         ).strip() or "region"
 
+        location_hint = str(
+            item.get("location_hint", "")
+        ).strip()
+
         objects.append(
             {
                 "label": label,
                 "confidence": confidence,
-                "box_normalized": [x1, y1, x2, y2],
-                "box": pixel_box,
+                "location_hint": location_hint,
+                "point_normalized": [x, y],
+                "point": pixel_point,
             }
         )
 
     return objects
 
 
-def boxes_to_mask(objects, image_width, image_height):
+def points_to_mask(objects, image_width, image_height, radius=20):
     """
-    Rasterize a list of pixel-space boxes into a boolean mask.
+    Rasterize a list of pixel-space points into a boolean mask
+    of small filled circles.
 
-    Returns:
-        NumPy boolean array with shape (height, width).
+    This is only used as a fallback when SAM is unavailable; the
+    real mask normally comes from SAM's point-prompted
+    segmentation instead.
     """
 
     mask = np.zeros(
@@ -209,20 +270,19 @@ def boxes_to_mask(objects, image_width, image_height):
         dtype=bool,
     )
 
+    y_grid, x_grid = np.ogrid[:image_height, :image_width]
+
     for item in objects:
 
-        x1, y1, x2, y2 = item["box"]
+        x, y = item["point"]
 
-        row_start = max(0, int(round(y1)))
-        row_end = min(image_height, int(round(y2)))
+        distance_squared = (
+            (x_grid - x) ** 2
+            +
+            (y_grid - y) ** 2
+        )
 
-        col_start = max(0, int(round(x1)))
-        col_end = min(image_width, int(round(x2)))
-
-        if row_end <= row_start or col_end <= col_start:
-            continue
-
-        mask[row_start:row_end, col_start:col_end] = True
+        mask |= distance_squared <= radius ** 2
 
     return mask
 
@@ -230,7 +290,7 @@ def boxes_to_mask(objects, image_width, image_height):
 if __name__ == "__main__":
 
     sample_response = """
-    {"objects": [{"label": "water", "box": [120, 300, 480, 620], "confidence": "high"}]}
+    {"objects": [{"label": "water", "point": [650, 550], "location_hint": "rectangular basin, right of center", "confidence": "high"}]}
     """
 
     result = parse_grounding_response(
@@ -241,7 +301,7 @@ if __name__ == "__main__":
 
     print(result)
 
-    mask = boxes_to_mask(
+    mask = points_to_mask(
         result,
         image_width=1024,
         image_height=768,

@@ -315,38 +315,60 @@ Additional user request:
 GROUNDING_PROMPT_TEMPLATE = """
 You are performing visual grounding on a satellite image.
 
-Task: Localize EVERY region in the image that matches the
+Task: Localize EVERY instance in the image that matches the
 following request:
 
 {query}
 
-Be exhaustive. Scan the entire image systematically, from
-top-left to bottom-right, before answering. Satellite images
-frequently contain many separate instances of the same
-feature (for example, several distinct clusters of trees,
-several buildings, several patches of water). Report ALL of
-them, not just the one or two most obvious instances. Include
-small or partially visible instances as long as they are
-visually supported. Under-reporting is a more serious error
-than over-reporting borderline cases at "low" confidence.
+COORDINATE SYSTEM (read carefully, this is the most common
+source of error):
+- Coordinates are (x, y) on a 0-1000 scale for BOTH axes,
+  regardless of the image's actual pixel width or height.
+- (0, 0) is the top-left corner of the image.
+- (1000, 0) is the top-right corner.
+- (0, 1000) is the bottom-left corner.
+- (1000, 1000) is the bottom-right corner.
+- (500, 500) is the exact center of the image.
+- Example: a feature occupying most of the lower-right area
+  of the image, away from the center, would have a point
+  such as (750, 750). A feature in the upper-left area, away
+  from the center, would have a point such as (200, 200).
+- Before answering, mentally divide the image into four
+  quadrants (top-left, top-right, bottom-left, bottom-right)
+  and double-check which quadrant each instance is actually
+  in. Getting the quadrant wrong is a serious error.
+
+INSTRUCTIONS:
+1. Scan the entire image systematically, quadrant by
+   quadrant, before answering.
+2. Satellite images frequently contain many separate
+   instances of the same feature (several distinct clusters
+   of trees, several buildings, several patches of water).
+   Report ALL clearly visible instances, not just the most
+   obvious one. Do not report instances you are not
+   confident are actually visible.
+3. For each instance, give ONE point placed at its visual
+   center (not its edge, not a rough guess of some other
+   part of the image).
+4. For each instance, briefly describe where it is in plain
+   words (e.g. "large dark rectangular basin in the lower
+   right quadrant, right of center"). This description must
+   be consistent with the point you give.
 
 Respond with ONLY a JSON object, with no other text, no
 markdown code fences, and no explanation, in exactly this
 format:
 
-{{"objects": [{{"label": "<short label>", "box": [x1, y1, x2, y2], "confidence": "high|medium|low"}}]}}
+{{"objects": [{{"label": "<short label>", "point": [x, y], "location_hint": "<brief plain-word description of where this is in the image>", "confidence": "high|medium|low"}}]}}
 
 Rules:
-1. Coordinates (x1, y1, x2, y2) are normalized to a 0-1000
-   scale, where (0, 0) is the top-left corner of the image
-   and (1000, 1000) is the bottom-right corner.
-2. x1 must be less than x2, and y1 must be less than y2.
-3. Include one entry per distinct, spatially separate region
-   that matches the request. Do not merge separate instances
-   into a single box unless they are contiguous.
-4. If nothing in the image matches the request, respond with
+1. point is a single [x, y] pair on the 0-1000 scale
+   described above.
+2. Include one entry per distinct, spatially separate
+   instance.
+3. If nothing in the image matches the request, respond with
    {{"objects": []}}.
-5. Do not invent regions that are not visually supported.
+4. Do not invent instances that are not visually supported.
 """
 
 

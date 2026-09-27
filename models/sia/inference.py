@@ -22,7 +22,7 @@ from models.sia.prompts import (
 
 from models.sia.grounding import (
     parse_grounding_response,
-    boxes_to_mask,
+    points_to_mask,
 )
 
 from geospatial.visualization import (
@@ -476,13 +476,24 @@ class SIAInference:
                 "Query cannot be empty."
             )
 
-        self.load_model()
-
         image = self.load_image(
             image_path
         )
 
         image_width, image_height = image.size
+
+        heuristic_result = self._ground_with_heuristic(
+            image=image,
+            image_path=image_path,
+            query=query,
+            output_path=output_path
+        )
+
+        if heuristic_result is not None:
+
+            return heuristic_result
+
+        self.load_model()
 
         prompt = build_grounding_prompt(
             query
@@ -559,8 +570,9 @@ class SIAInference:
 
         if objects:
 
-            mask = boxes_to_mask(
-                objects,
+            mask = self._refine_mask_with_sam(
+                image=image,
+                objects=objects,
                 image_width=image_width,
                 image_height=image_height
             )
@@ -586,13 +598,29 @@ class SIAInference:
                 output_path
             )
 
+            descriptions = []
+
+            for item in objects:
+
+                description = (
+                    f"{item['label']} "
+                    f"({item['confidence']} confidence)"
+                )
+
+                if item.get("location_hint"):
+
+                    description += (
+                        f" — {item['location_hint']}"
+                    )
+
+                descriptions.append(
+                    description
+                )
+
             answer = (
                 f"Found {len(objects)} region(s) matching "
                 f"'{query.strip()}': "
-                + ", ".join(
-                    f"{item['label']} ({item['confidence']} confidence)"
-                    for item in objects
-                )
+                + "; ".join(descriptions)
             )
 
         else:
@@ -619,6 +647,179 @@ class SIAInference:
                 else None
             ),
         }
+
+
+    @staticmethod
+    def _ground_with_heuristic(
+        image,
+        image_path,
+        query,
+        output_path=None
+    ):
+        """
+        Try deterministic pixel-level detection for a handful
+        of common, visually well-defined classes (water,
+        vegetation, urban, road) before ever calling the VLM.
+
+        Asking a general VQA-tuned VLM to localize these is
+        unreliable: there is no guarantee it was ever trained
+        on spatial grounding at all, and a wrong answer here
+        looks identical to a right one until you inspect the
+        image. For these classes the correct region is directly
+        computable from color and texture, with zero chance of
+        the model confidently pointing at the wrong place, or
+        missing an obvious instance entirely.
+
+        Returns:
+            A full grounding result dict if a known class was
+            matched and produced a non-empty mask, else None
+            (the caller should fall back to VLM + SAM
+            grounding).
+        """
+
+        from geospatial.semantic_masks import (
+            match_known_class,
+            detect_class_mask,
+        )
+
+        class_name = match_known_class(
+            query
+        )
+
+        if class_name is None:
+            return None
+
+        print(
+            f"\nQuery matched known class '{class_name}'; "
+            "using deterministic pixel detection instead of "
+            "VLM grounding."
+        )
+
+        mask = detect_class_mask(
+            image,
+            class_name
+        )
+
+        if mask is None or not mask.any():
+
+            print(
+                f"No '{class_name}' regions were detected "
+                "by the heuristic; falling back to VLM "
+                "grounding."
+            )
+
+            return None
+
+        visualizer = SpatialVisualizer(
+            image_path
+        )
+
+        visualizer.draw_mask(mask)
+        visualizer.draw_mask_boundary(mask)
+
+        if output_path is None:
+
+            stem = Path(image_path).stem
+
+            output_path = (
+                Path("data/output")
+                /
+                f"grounding_{stem}.png"
+            )
+
+        output_path = visualizer.save(
+            output_path
+        )
+
+        coverage_percent = round(
+            100.0 * float(mask.mean()),
+            2
+        )
+
+        answer = (
+            f"Highlighted all detected '{class_name}' "
+            f"regions ({coverage_percent}% of the image) "
+            "using direct pixel color/texture analysis."
+        )
+
+        image_width, image_height = image.size
+
+        return {
+            "model": "heuristic:" + class_name,
+            "query": query,
+            "answer": answer,
+            "raw_response": None,
+            "objects": [
+                {
+                    "label": class_name,
+                    "confidence": "high",
+                    "location_hint": (
+                        "detected directly from pixel "
+                        "color/texture, not model-localized"
+                    ),
+                }
+            ],
+            "image_width": image_width,
+            "image_height": image_height,
+            "device": "local",
+            "image_path": str(
+                output_path
+            ),
+        }
+
+
+    @staticmethod
+    def _refine_mask_with_sam(
+        image,
+        objects,
+        image_width,
+        image_height
+    ):
+        """
+        Turn the VLM's rough points into a true pixel-level
+        mask using Segment Anything.
+
+        Each point is used as a prompt: SAM grows it into the
+        full boundary of whatever object sits at that location.
+        Falls back to small filled circles around each point if
+        SAM is unavailable (not installed, checkpoint download
+        failed, etc.) so grounding degrades instead of breaking
+        outright.
+        """
+
+        points = [
+            item["point"]
+            for item in objects
+        ]
+
+        try:
+
+            from models.sam.segment import (
+                segment_objects_from_points,
+            )
+
+            print(
+                "\nRefining points into pixel masks "
+                "with SAM..."
+            )
+
+            return segment_objects_from_points(
+                image,
+                points
+            )
+
+        except Exception as exc:
+
+            print(
+                "\nSAM refinement unavailable, falling "
+                f"back to point-radius mask: {exc}"
+            )
+
+            return points_to_mask(
+                objects,
+                image_width=image_width,
+                image_height=image_height
+            )
 
 
     # ========================================================
